@@ -1,0 +1,72 @@
+export const ORDER_STATUSES = {
+  TO_DO: "TO_DO",
+  IN_PROGRESS: "IN_PROGRESS",
+  DONE: "DONE",
+  CANCELLED: "CANCELLED",
+} as const
+
+export const ITEM_STATUSES = {
+  TO_DO: "TO_DO",
+  GRAPHICS: "GRAPHICS",
+  PRINTING: "PRINTING",
+  CUTTING: "CUTTING",
+  FINISHING: "FINISHING",
+  PACKING: "PACKING",
+  DONE: "DONE",
+  STANDBY: "STANDBY",
+  CANCELLED: "CANCELLED",
+} as const
+
+export const PRIORITIES = {
+  LOW: "LOW",
+  NORMAL: "NORMAL",
+  HIGH: "HIGH",
+  URGENT: "URGENT",
+} as const
+
+export const RECEIVED_THROUGH = {
+  FACEBOOK: "FACEBOOK",
+  WHATSAPP: "WHATSAPP",
+  PHONE: "PHONE",
+  IN_PERSON: "IN_PERSON",
+  EMAIL: "EMAIL",
+} as const
+
+export const USER_ROLES = {
+  ADMIN: "ADMIN",
+  EMPLOYEE: "EMPLOYEE",
+} as const
+
+export const STATUS_LABELS = {
+  [ORDER_STATUSES.TO_DO]: "To Do",
+  [ORDER_STATUSES.IN_PROGRESS]: "In Progress",
+  [ORDER_STATUSES.DONE]: "Done",
+  [ORDER_STATUSES.CANCELLED]: "Cancelled",
+}
+
+export const ITEM_STATUS_LABELS = {
+  [ITEM_STATUSES.TO_DO]: "To Do",
+  [ITEM_STATUSES.GRAPHICS]: "Graphics",
+  [ITEM_STATUSES.PRINTING]: "Printing",
+  [ITEM_STATUSES.CUTTING]: "Cutting",
+  [ITEM_STATUSES.FINISHING]: "Finishing",
+  [ITEM_STATUSES.PACKING]: "Packing",
+  [ITEM_STATUSES.DONE]: "Done",
+  [ITEM_STATUSES.STANDBY]: "Standby",
+  [ITEM_STATUSES.CANCELLED]: "Cancelled",
+}
+
+export const PRIORITY_LABELS = {
+  [PRIORITIES.LOW]: "Low",
+  [PRIORITIES.NORMAL]: "Normal",
+  [PRIORITIES.HIGH]: "High",
+  [PRIORITIES.URGENT]: "Urgent",
+}
+
+export const RECEIVED_THROUGH_LABELS = {
+  [RECEIVED_THROUGH.FACEBOOK]: "Facebook",
+  [RECEIVED_THROUGH.WHATSAPP]: "WhatsApp",
+  [RECEIVED_THROUGH.PHONE]: "Phone",
+  [RECEIVED_THROUGH.IN_PERSON]: "In-person",
+  [RECEIVED_THROUGH.EMAIL]: "Email",
+}
