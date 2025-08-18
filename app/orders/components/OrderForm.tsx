@@ -37,7 +37,7 @@ import {
   CommandEmpty,
 } from "@/components/ui/command";
 import { PlusCircle, X, ChevronDown, ChevronRight } from "lucide-react";
-import ClientAutocomplete from "@/app/orders/components/client-autocomplete";
+import ClientAutocomplete, { type ClientSelection } from "@/app/orders/components/client-autocomplete";
 import ProductPicker from "@/app/orders/components/product-picker";
 import ClientForm, {
   type ClientFormValues,
@@ -186,8 +186,31 @@ export default function OrderForm({
       dueDate: defaults?.dueDate || new Date().toISOString().slice(0, 10),
       receivedThrough: (defaults?.receivedThrough as any) || "IN_PERSON",
       status: (defaults?.status as any) || "TO_DO",
-      customer:
-        (defaults as any)?.customer?._id || (defaults?.customer as any) || "",
+      customer: (() => {
+        // Handle both old and new format
+        const customerValue = (defaults as any)?.customer;
+        if (!customerValue) return "";
+        
+        // If it's already in new format (JSON string)
+        if (typeof customerValue === "string" && customerValue.startsWith("{")) {
+          return customerValue;
+        }
+        
+        // If it's old format (just client ID) or object with _id
+        const clientId = customerValue._id || customerValue;
+        if (clientId) {
+          // Convert to new format as physical person (safest default)
+          const selection = {
+            clientId,
+            companyId: undefined,
+            displayName: "Loading...", // Will be updated when client data loads
+            isPhysicalPerson: true
+          };
+          return JSON.stringify(selection);
+        }
+        
+        return "";
+      })(),
       priority: (defaults?.priority as any) || "NORMAL",
       description: defaults?.description || "",
       items: (defaults as any)?.items || [],
@@ -203,8 +226,25 @@ export default function OrderForm({
   const handleSubmit = form.handleSubmit((vals) => {
     const me = resolvedMe || "";
 
+    // Extract customer info from the new format
+    let customerId = "";
+    let customerCompanyId: string | undefined;
+    
+    try {
+      if (vals.customer) {
+        const selection = JSON.parse(vals.customer);
+        customerId = selection.clientId;
+        customerCompanyId = selection.companyId;
+      }
+    } catch {
+      // Fallback for old format
+      customerId = vals.customer;
+    }
+
     const fixed: OrderFormValues = {
       ...vals,
+      customer: customerId, // Send just the client ID to backend
+      // Note: You might want to also send customerCompanyId separately if needed
       items: vals.items.map((item) => {
         // If item is cancelled, no assignments needed
         if (item.itemStatus === "CANCELLED") {
@@ -231,7 +271,8 @@ export default function OrderForm({
           { assignedTo: string; stageNotes?: string }
         >();
         for (const a of item.assignments || []) {
-          if (stagesRequiringAssignment.includes(a.stage) && a.assignedTo) {
+          const isStageRequired = stagesRequiringAssignment.some(s => s === a.stage);
+          if (isStageRequired && a.assignedTo) {
             map.set(a.stage, {
               assignedTo: a.assignedTo,
               stageNotes: a.stageNotes,
@@ -367,16 +408,23 @@ export default function OrderForm({
               <div className="flex-1">
                 <ClientAutocomplete
                   value={form.watch("customer")}
-                  onChange={(id) =>
-                    form.setValue("customer", id, { shouldDirty: true })
+                  onChange={(selection) =>
+                    form.setValue("customer", JSON.stringify(selection), { shouldDirty: true })
                   }
                 />
               </div>
               {/* NEW: Create Client as MODAL */}
               <CreateClientModal
-                onCreated={(id) =>
-                  form.setValue("customer", id, { shouldDirty: true })
-                }
+                onCreated={(clientId) => {
+                  // When creating a new client, default to physical person
+                  const selection = {
+                    clientId,
+                    companyId: undefined,
+                    displayName: "New Client (Physical Person)",
+                    isPhysicalPerson: true
+                  };
+                  form.setValue("customer", JSON.stringify(selection), { shouldDirty: true })
+                }}
               />
             </div>
           </div>
@@ -893,7 +941,7 @@ export default function OrderForm({
 }
 
 /* ==================== Create Client MODAL (shadcn) ==================== */
-function CreateClientModal({ onCreated }: { onCreated: (id: string) => void }) {
+function CreateClientModal({ onCreated }: { onCreated: (clientId: string) => void }) {
   const [open, setOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -903,9 +951,9 @@ function CreateClientModal({ onCreated }: { onCreated: (id: string) => void }) {
       setSubmitting(true);
       setError(null);
       const res = await api.post("/api/clients", values);
-      const id = res?.data?._id;
-      if (id) {
-        onCreated(id);
+      const clientId = res?.data?._id;
+      if (clientId) {
+        onCreated(clientId);
         setOpen(false);
       }
     } catch (e: any) {

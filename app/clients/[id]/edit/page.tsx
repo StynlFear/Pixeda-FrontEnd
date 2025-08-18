@@ -7,6 +7,7 @@ import api from "@/lib/axios"
 import { AppLayout } from "@/components/layout/app-layout"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import ClientForm, { ClientFormValues } from "@/app/clients/components/ClientForm"
+import type { CompanyOption } from "@/app/clients/components/ClientForm"
 
 type Props = { params: { id: string } }
 
@@ -17,45 +18,73 @@ export default function EditClientPage({ params }: Props) {
   const [loading, setLoading] = React.useState(true)
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [client, setClient] = React.useState<ClientFormValues | null>(null)
+  const [clientDefaults, setClientDefaults] = React.useState<Partial<ClientFormValues> | null>(null)
 
   React.useEffect(() => {
     let cancelled = false
+
     async function load() {
       try {
         setLoading(true)
         const res = await api.get(`/api/clients/${id}`)
         const c = res.data?.data || res.data
-        const values: ClientFormValues = {
+
+        // c.companies can be an array of ObjectIds or populated Company docs
+        const companies: CompanyOption[] = Array.isArray(c?.companies)
+          ? c.companies.map((co: any) =>
+              typeof co === "string"
+                ? ({ _id: co, name: "…" } as CompanyOption)
+                : ({
+                    _id: co._id,
+                    name: co.name,
+                    cui: co.cui,
+                    defaultFolderPath: co.defaultFolderPath,
+                    description: co.description,
+                  } as CompanyOption)
+            )
+          : []
+
+        const values: Partial<ClientFormValues> = {
           firstName: c?.firstName ?? "",
           lastName: c?.lastName ?? "",
           email: c?.email ?? "",
-          companyName: c?.companyName ?? "",
-          companyCode: c?.companyCode ?? "",
           phone: c?.phone ?? "",
-          folderPath: c?.folderPath ?? "",
+          whatsapp: c?.whatsapp ?? "",
+          defaultFolderPath: c?.defaultFolderPath ?? "",
+          // pass both so the form shows chips AND has ids
+          companyIds: companies.map((x) => x._id),
+          // @ts-expect-error — our ClientForm accepts `companies` in defaultValues for chip labels
+          companies,
         }
-        if (!cancelled) setClient(values)
+
+        if (!cancelled) setClientDefaults(values)
       } catch (e: any) {
-        if (!cancelled) {
-          setError(e?.response?.data?.message || e.message || "Failed to load client.")
-        }
+        if (!cancelled) setError(e?.response?.data?.message || e.message || "Failed to load client.")
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
+
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [id])
 
   function sanitizePayload(values: ClientFormValues) {
-    // remove fields that are empty strings, null, or undefined (prevents unique:null issues)
-    const payload: Record<string, any> = { ...values }
-    Object.keys(payload).forEach((k) => {
-      if (payload[k] === "" || payload[k] === null || payload[k] === undefined) {
-        delete payload[k]
-      }
-    })
+    const payload: Record<string, any> = {
+      firstName: values.firstName?.trim(),
+      lastName: values.lastName?.trim(),
+      email: values.email?.trim() || undefined,
+      phone: values.phone?.trim() || undefined,
+      whatsapp: values.whatsapp?.trim() || undefined,
+      defaultFolderPath: values.defaultFolderPath?.trim() || undefined,
+      // IMPORTANT: backend expects `companies` (array of ObjectId strings)
+      companies: values.companyIds ?? [],
+    }
+
+    // drop undefined
+    Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k])
     return payload
   }
 
@@ -67,7 +96,6 @@ export default function EditClientPage({ params }: Props) {
       router.push(`/clients/${id}`)
       router.refresh()
     } catch (e: any) {
-      // surface duplicate/validation messages if backend sends them
       setError(e?.response?.data?.message || e.message || "Failed to update client.")
     } finally {
       setSubmitting(false)
@@ -92,7 +120,7 @@ export default function EditClientPage({ params }: Props) {
             <div className="py-10 text-sm text-muted-foreground">Loading…</div>
           ) : (
             <ClientForm
-              defaultValues={client ?? undefined}
+              defaultValues={clientDefaults ?? undefined}
               submitting={submitting}
               error={error}
               submitLabel="Save changes"

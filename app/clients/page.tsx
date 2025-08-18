@@ -1,3 +1,4 @@
+// app/clients/page.tsx
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -24,14 +25,23 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useDebounce } from "@/hooks/use-debounce"
 
+type Company = {
+  _id: string
+  name: string
+  cui?: string
+  defaultFolderPath?: string
+  description?: string
+}
+
 type Client = {
   _id: string
   firstName: string
   lastName: string
   email?: string
-  companyName?: string
   phone?: string
-  folderPath?: string          // 👈 add this
+  whatsapp?: string
+  defaultFolderPath?: string
+  companies: (Company | string)[]
   createdAt: string
 }
 
@@ -70,7 +80,12 @@ export default function ClientsPage() {
           params: { search: debouncedSearch || undefined, page, limit, sort },
         })
         const { items, total } = res.data || {}
-        setItems(Array.isArray(items) ? items : [])
+        // ensure companies is an array for each client
+        const normalized: Client[] = (Array.isArray(items) ? items : []).map((c: any) => ({
+          ...c,
+          companies: Array.isArray(c?.companies) ? c.companies : [],
+        }))
+        setItems(normalized)
         setTotal(typeof total === "number" ? total : 0)
       } catch (e) {
         console.error("Failed to fetch clients:", e)
@@ -93,13 +108,21 @@ export default function ClientsPage() {
       else {
         const res = await api.get("/api/clients", { params: { search: debouncedSearch || undefined, page, limit, sort } })
         const { items: newItems, total: newTotal } = res.data || {}
-        setItems(Array.isArray(newItems) ? newItems : [])
+        const normalized: Client[] = (Array.isArray(newItems) ? newItems : []).map((c: any) => ({
+          ...c,
+          companies: Array.isArray(c?.companies) ? c.companies : [],
+        }))
+        setItems(normalized)
         setTotal(typeof newTotal === "number" ? newTotal : 0)
       }
     } catch (e) {
       console.error("Delete failed:", e)
     }
   }
+
+  // helper: normalize companies for row rendering
+  const normalizeCompanies = (arr: (Company | string)[]) =>
+    (arr ?? []).map((co) => (typeof co === "string" ? ({ _id: co, name: "…" } as Company) : co))
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -141,102 +164,121 @@ export default function ClientsPage() {
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
-  <TableRow>
-    <TableHead>Name</TableHead>
-    <TableHead>Company</TableHead>
-    <TableHead>Contact</TableHead>
-    <TableHead>Folder path</TableHead>   {/* 👈 new */}
-    <TableHead>Created</TableHead>
-    <TableHead className="text-right">Actions</TableHead>
-  </TableRow>
-</TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Companies</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Folder path</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         Loading...
                       </TableCell>
                     </TableRow>
                   ) : items.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                         No clients found
                       </TableCell>
                     </TableRow>
                   ) : (
-                    items.map((client) => (
-                      <TableRow key={client._id}>
-                        <TableCell className="font-medium">
-                          {client.firstName} {client.lastName}
-                        </TableCell>
-                        <TableCell>
-                          {client.companyName ? (
-                            <Badge variant="secondary">{client.companyName}</Badge>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <div className="space-y-1">
-                            {client.email && <div className="text-sm">{client.email}</div>}
-                            {client.phone && <div className="text-sm text-muted-foreground">{client.phone}</div>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-          {client.folderPath ? (
-            <div
-              className="max-w-[280px] truncate font-mono text-xs"
-              title={client.folderPath}
-            >
-              {client.folderPath}
-            </div>
-          ) : (
-            <span className="text-muted-foreground">-</span>
-          )}
-        </TableCell>
-                        <TableCell>{new Date(client.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/clients/${client._id}`}>
-                                <Eye className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                            <Button variant="ghost" size="sm" asChild>
-                              <Link href={`/clients/${client._id}/edit`}>
-                                <Edit className="h-4 w-4" />
-                              </Link>
-                            </Button>
+                    items.map((client) => {
+                      const companies = normalizeCompanies(client.companies)
+                      return (
+                        <TableRow key={client._id}>
+                          <TableCell className="font-medium">
+                            {client.firstName} {client.lastName}
+                          </TableCell>
 
-                            {/* Delete with confirm */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete client?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. The client will be permanently removed.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-red-600 hover:bg-red-700"
-                                    onClick={() => handleDelete(client._id)}
-                                  >
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                          <TableCell>
+                            {companies.length ? (
+                              <div className="flex flex-wrap gap-2">
+                                {companies.map((co) => (
+                                  <Link key={co._id} href={`/companies/${co._id}`}>
+                                    <Badge className="bg-gray-800 text-gray-100 hover:bg-gray-700">
+                                      {co.name}
+                                    </Badge>
+                                  </Link>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+
+                          <TableCell>
+                            <div className="space-y-1">
+                              {client.email && <div className="text-sm">{client.email}</div>}
+                              {client.phone && <div className="text-sm text-muted-foreground">{client.phone}</div>}
+                              {client.whatsapp && (
+                                <div className="text-xs text-muted-foreground">WhatsApp: {client.whatsapp}</div>
+                              )}
+                            </div>
+                          </TableCell>
+
+                          <TableCell>
+                            {client.defaultFolderPath ? (
+                              <div
+                                className="max-w-[280px] truncate font-mono text-xs"
+                                title={client.defaultFolderPath}
+                              >
+                                {client.defaultFolderPath}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+
+                          <TableCell>{new Date(client.createdAt).toLocaleDateString()}</TableCell>
+
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/clients/${client._id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/clients/${client._id}/edit`}>
+                                  <Edit className="h-4 w-4" />
+                                </Link>
+                              </Button>
+
+                              {/* Delete with confirm */}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete client?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. The client will be permanently removed.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-red-600 hover:bg-red-700"
+                                      onClick={() => handleDelete(client._id)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
                   )}
                 </TableBody>
               </Table>
@@ -245,7 +287,11 @@ export default function ClientsPage() {
             {/* Pagination */}
             <div className="flex items-center justify-between mt-4">
               <p className="text-sm text-muted-foreground">
-                {total > 0 ? <>Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} clients</> : <>No results</>}
+                {total > 0 ? (
+                  <>Showing {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total} clients</>
+                ) : (
+                  <>No results</>
+                )}
               </p>
               <div className="flex items-center gap-2">
                 <Button

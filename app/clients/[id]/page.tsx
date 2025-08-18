@@ -14,15 +14,23 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
+type Company = {
+  _id: string
+  name: string
+  cui?: string
+  defaultFolderPath?: string
+  description?: string
+}
+
 type Client = {
   _id: string
   firstName: string
   lastName: string
   email?: string
-  companyName?: string
-  companyCode?: string
   phone?: string
-  folderPath?: string
+  whatsapp?: string
+  defaultFolderPath?: string
+  companies: (Company | string)[]
   createdAt: string
   updatedAt: string
 }
@@ -33,10 +41,13 @@ const MOCK_CLIENT: Client = {
   firstName: "Laura",
   lastName: "Golofca",
   email: "laura@pixeda.ro",
-  companyName: "Pixeda SRL",
-  companyCode: "RO12345678",
   phone: "+40 723 123 456",
-  folderPath: "\\\\server\\clients\\pixeda\\golofca-laura",
+  whatsapp: "+40 723 123 456",
+  defaultFolderPath: "\\\\server\\clients\\pixeda\\golofca-laura",
+  companies: [
+    { _id: "66b8c0f1f9e9d01234567890", name: "Pixeda SRL", cui: "RO12345678" },
+    { _id: "66b8c0f1f9e9d01234567891", name: "Grafix Media" },
+  ],
   createdAt: "2025-08-01T09:12:34.000Z",
   updatedAt: "2025-08-10T15:45:00.000Z",
 }
@@ -73,12 +84,11 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
           return
         }
 
-        // Using our Axios instance (lib/axios) so baseURL + token are handled
         const res = await api.get(`/api/clients/${id}`)
-        // Your OpenAPI shows 200 -> Client directly. Still guard for {data} just in case.
         const data = (res.data?.data ?? res.data) as Client
 
-        if (!cancelled) setClient(data)
+        // Ensure companies is an array
+        if (!cancelled) setClient({ ...data, companies: Array.isArray(data.companies) ? data.companies : [] })
       } catch (e: any) {
         if (!cancelled) {
           const msg =
@@ -93,9 +103,7 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
     }
 
     load()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [id, useMock])
 
   async function handleDelete() {
@@ -114,6 +122,14 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
       setDeleting(false)
     }
   }
+
+  // Helper: normalize companies for rendering (handles ObjectId strings)
+  const normalizedCompanies: Company[] = React.useMemo(() => {
+    const raw = client?.companies ?? []
+    return raw.map((c: Company | string) =>
+      typeof c === "string" ? ({ _id: c, name: "…" } as Company) : c
+    )
+  }, [client])
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -179,7 +195,7 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
           <Card>
             <CardHeader>
               <CardTitle>Profile</CardTitle>
-              <CardDescription>Contact and company information</CardDescription>
+              <CardDescription>Contact & affiliations</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -187,24 +203,6 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
                   <div className="text-sm text-muted-foreground">Full name</div>
                   <div className="text-base font-medium">
                     {client.firstName} {client.lastName}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-muted-foreground">Company</div>
-                  <div className="text-base">
-                    {client.companyName ? (
-                      <Badge variant="secondary">{client.companyName}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-muted-foreground">Company code</div>
-                  <div className="text-base">
-                    {client.companyCode || <span className="text-muted-foreground">—</span>}
                   </div>
                 </div>
 
@@ -230,11 +228,41 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
                   </div>
                 </div>
 
-                <div className="md:col-span-2">
-                  <div className="text-sm text-muted-foreground">Folder path</div>
+                <div>
+                  <div className="text-sm text-muted-foreground">WhatsApp</div>
                   <div className="text-base">
-                    {client.folderPath || <span className="text-muted-foreground">—</span>}
+                    {client.whatsapp ? (
+                      <a className="underline" href={`tel:${client.whatsapp}`}>{client.whatsapp}</a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </div>
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className="text-sm text-muted-foreground">Personal folder path</div>
+                  <div className="text-base">
+                    {client.defaultFolderPath || <span className="text-muted-foreground">—</span>}
+                  </div>
+                </div>
+
+                {/* Companies */}
+                <div className="md:col-span-2">
+                  <div className="text-sm text-muted-foreground mb-1">Companies</div>
+                  {normalizedCompanies.length ? (
+                    <div className="flex flex-wrap gap-2">
+                      {normalizedCompanies.map((co) => (
+                        <Link key={co._id} href={`/companies/${co._id}`} className="group">
+                          <Badge className="bg-gray-800 text-gray-100 hover:bg-gray-700 transition-colors">
+                            <span className="mr-1">{co.name}</span>
+                            {co.cui ? <span className="opacity-70">({co.cui})</span> : null}
+                          </Badge>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </div>
               </div>
 
