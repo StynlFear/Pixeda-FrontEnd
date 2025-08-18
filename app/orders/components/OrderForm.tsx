@@ -87,6 +87,7 @@ const schema = z.object({
     .enum(["TO_DO", "READY_TO_BE_TAKEN", "IN_EXECUTION", "IN_PAUSE", "IN_PROGRESS", "DONE", "CANCELLED"])
     .default("TO_DO"),
   customer: z.string().min(1, "Select a client"),
+  customerCompany: z.string().optional(),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
   description: z.string().optional(),
   items: z
@@ -98,22 +99,18 @@ const schema = z.object({
         priceSnapshot: z.number().optional(),
         quantity: z.number().min(1),
         itemStatus: z.enum(STAGES).default("TO_DO"),
-        attachments: z.array(z.any()).optional(),
-        // NEW: Two optional images per product
-        graphicsImage: z.any().optional(),
-        finishedProductImage: z.any().optional(),
-        // NEW
+        attachments: z.array(z.string()).optional(),
+        graphicsImage: z.instanceof(File).optional().or(z.string().optional()),
+        finishedProductImage: z.instanceof(File).optional().or(z.string().optional()),
         textToPrint: z.string().optional(),
         editableFilePath: z.string().optional(),
         printingFilePath: z.string().optional(),
-        // Per-product disabled stages
         disabledStages: z.array(z.string()).optional(),
-
         assignments: z.array(
           z.object({
             stage: z.enum(STAGES),
             assignedTo: z.string().min(1),
-            stageNotes: z.string().optional(), // NEW: specific notes for this stage
+            stageNotes: z.string().optional(),
           })
         ),
       })
@@ -132,7 +129,7 @@ export default function OrderForm({
   currentUserId, // NEW: cine e “eu” (default assignee)
 }: {
   defaults?: Partial<OrderFormValues>;
-  onSubmit: (values: OrderFormValues) => Promise<void> | void;
+  onSubmit: (values: OrderFormValues | FormData) => Promise<void> | void;
   submitting?: boolean;
   error?: string | null;
   currentUserId?: string; // dacă nu vine, încercăm să-l detectăm din /api/me
@@ -186,36 +183,29 @@ export default function OrderForm({
       dueDate: defaults?.dueDate || new Date().toISOString().slice(0, 10),
       receivedThrough: (defaults?.receivedThrough as any) || "IN_PERSON",
       status: (defaults?.status as any) || "TO_DO",
-      customer: (() => {
-        // Handle both old and new format
-        const customerValue = (defaults as any)?.customer;
-        if (!customerValue) return "";
-        
-        // If it's already in new format (JSON string)
-        if (typeof customerValue === "string" && customerValue.startsWith("{")) {
-          return customerValue;
-        }
-        
-        // If it's old format (just client ID) or object with _id
-        const clientId = customerValue._id || customerValue;
-        if (clientId) {
-          // Convert to new format as physical person (safest default)
-          const selection = {
-            clientId,
-            companyId: undefined,
-            displayName: "Loading...", // Will be updated when client data loads
-            isPhysicalPerson: true
-          };
-          return JSON.stringify(selection);
-        }
-        
-        return "";
-      })(),
+      customer: defaults?.customer || "",
+      customerCompany: defaults?.customerCompany || "",
       priority: (defaults?.priority as any) || "NORMAL",
       description: defaults?.description || "",
       items: (defaults as any)?.items || [],
     },
   });
+
+  // Reset form when defaults change (for edit mode)
+  React.useEffect(() => {
+    if (defaults && Object.keys(defaults).length > 0) {
+      form.reset({
+        dueDate: defaults.dueDate || new Date().toISOString().slice(0, 10),
+        receivedThrough: (defaults.receivedThrough as any) || "IN_PERSON",
+        status: (defaults.status as any) || "TO_DO",
+        customer: defaults.customer || "",
+        customerCompany: defaults.customerCompany || "",
+        priority: (defaults.priority as any) || "NORMAL",
+        description: defaults.description || "",
+        items: (defaults as any)?.items || [],
+      });
+    }
+  }, [defaults, form]);
 
   const items = form.watch("items");
 
@@ -223,7 +213,7 @@ export default function OrderForm({
   const [collapsedItems, setCollapsedItems] = React.useState<Set<number>>(
     new Set()
   );
-  const handleSubmit = form.handleSubmit((vals) => {
+  const handleSubmit = form.handleSubmit(async (vals) => {
     const me = resolvedMe || "";
 
     // Extract customer info from the new format
@@ -241,19 +231,27 @@ export default function OrderForm({
       customerId = vals.customer;
     }
 
-    const fixed: OrderFormValues = {
-      ...vals,
-      customer: customerId, // Send just the client ID to backend
-      // Note: You might want to also send customerCompanyId separately if needed
-      items: vals.items.map((item) => {
-        // If item is cancelled, no assignments needed
-        if (item.itemStatus === "CANCELLED") {
-          return {
-            ...item,
-            assignments: [],
-          };
-        }
+    // Create FormData for file uploads
+    const formData = new FormData();
+    
+    // Add basic order fields
+    formData.append('dueDate', vals.dueDate);
+    formData.append('receivedThrough', vals.receivedThrough);
+    formData.append('status', vals.status);
+    formData.append('customer', customerId);
+    if (customerCompanyId) {
+      formData.append('customerCompany', customerCompanyId);
+    }
+    formData.append('priority', vals.priority);
+    if (vals.description) {
+      formData.append('description', vals.description);
+    }
 
+    // Process items and add each field to FormData individually
+    vals.items.forEach((item, itemIndex) => {
+      // If item is cancelled, no assignments needed
+      let assignments = [];
+      if (item.itemStatus !== "CANCELLED") {
         // Get disabled stages for this specific item
         const itemDisabledStages = (item.disabledStages || []) as Stage[];
         const availableStages = STAGES.filter(
@@ -265,7 +263,7 @@ export default function OrderForm({
           (s) => s !== "CANCELLED" && s !== "DONE" && s !== "STANDBY"
         );
 
-        // păstrăm doar assignment-urile pe stagiile disponibile care necesită asignare
+        // Build assignments map
         const map = new Map<
           Stage,
           { assignedTo: string; stageNotes?: string }
@@ -280,26 +278,68 @@ export default function OrderForm({
           }
         }
 
-        // pentru orice stagiu fără assignedTo → default la me (doar pentru stagiile care necesită asignare)
+        // Default assignments for missing stages
         for (const s of stagesRequiringAssignment) {
           if (!map.has(s)) map.set(s, { assignedTo: me, stageNotes: "" });
         }
 
-        return {
-          ...item,
-          assignments: Array.from(
-            map,
-            ([stage, { assignedTo, stageNotes }]) => ({
-              stage,
-              assignedTo,
-              stageNotes,
-            })
-          ),
-        };
-      }),
-    };
+        assignments = Array.from(
+          map,
+          ([stage, { assignedTo, stageNotes }]) => ({
+            stage,
+            assignedTo,
+            stageNotes,
+          })
+        );
+      }
 
-    onSubmit(fixed);
+      // Add each item field to FormData
+      formData.append(`items[${itemIndex}][product]`, item.product);
+      formData.append(`items[${itemIndex}][productNameSnapshot]`, item.productNameSnapshot);
+      formData.append(`items[${itemIndex}][descriptionSnapshot]`, item.descriptionSnapshot || "");
+      if (item.priceSnapshot !== undefined) {
+        formData.append(`items[${itemIndex}][priceSnapshot]`, item.priceSnapshot.toString());
+      }
+      formData.append(`items[${itemIndex}][quantity]`, item.quantity.toString());
+      formData.append(`items[${itemIndex}][itemStatus]`, item.itemStatus);
+      formData.append(`items[${itemIndex}][textToPrint]`, item.textToPrint || "");
+      formData.append(`items[${itemIndex}][editableFilePath]`, item.editableFilePath || "");
+      formData.append(`items[${itemIndex}][printingFilePath]`, item.printingFilePath || "");
+      
+      // Handle arrays
+      if (item.attachments && item.attachments.length > 0) {
+        item.attachments.forEach((attachment, attachIndex) => {
+          formData.append(`items[${itemIndex}][attachments][${attachIndex}]`, attachment);
+        });
+      }
+      
+      if (item.disabledStages && item.disabledStages.length > 0) {
+        item.disabledStages.forEach((stage, stageIndex) => {
+          formData.append(`items[${itemIndex}][disabledStages][${stageIndex}]`, stage);
+        });
+      }
+      
+      // Handle assignments
+      assignments.forEach((assignment, assignIndex) => {
+        formData.append(`items[${itemIndex}][assignments][${assignIndex}][stage]`, assignment.stage);
+        formData.append(`items[${itemIndex}][assignments][${assignIndex}][assignedTo]`, assignment.assignedTo);
+        if (assignment.stageNotes) {
+          formData.append(`items[${itemIndex}][assignments][${assignIndex}][stageNotes]`, assignment.stageNotes);
+        }
+      });
+
+      // Handle file uploads for this item
+      if (item.graphicsImage instanceof File) {
+        formData.append(`items[${itemIndex}][graphicsImage]`, item.graphicsImage);
+      }
+      
+      if (item.finishedProductImage instanceof File) {
+        formData.append(`items[${itemIndex}][finishedProductImage]`, item.finishedProductImage);
+      }
+    });
+
+    // Call onSubmit with FormData instead of plain object
+    await onSubmit(formData as any);
   });
   // helper: build default assignments for an item (all enabled stages except CANCELLED, DONE, and STANDBY -> me)
   const makeDefaultAssignments = React.useCallback((itemDisabledStages: string[] = []) => {
@@ -324,12 +364,12 @@ export default function OrderForm({
         quantity: 1,
         itemStatus: "TO_DO" as const,
         attachments: [],
-        graphicsImage: null, // NEW: optional graphics image
-        finishedProductImage: null, // NEW: optional finished product image
-        textToPrint: "", // NEW
-        editableFilePath: "", // NEW
-        printingFilePath: "", // NEW
-        disabledStages: [], // NEW: per-product disabled stages
+        graphicsImage: null, // File or string
+        finishedProductImage: null, // File or string
+        textToPrint: "",
+        editableFilePath: "",
+        printingFilePath: "",
+        disabledStages: [],
         assignments: [],
       },
     ];

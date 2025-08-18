@@ -22,48 +22,46 @@ const menuItems = [
     title: "Dashboard",
     url: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["ADMIN", "EMPLOYEE"],
+    roles: ["admin", "employee"],
   },
   {
     title: "Companies",
     url: "/companies",
     icon: BriefcaseBusiness,
-    roles: ["ADMIN", "EMPLOYEE"],
+    roles: ["admin", "employee"],
   },
   {
     title: "Clients",
     url: "/clients",
     icon: Users,
-    roles: ["ADMIN", "EMPLOYEE"],
+    roles: ["admin", "employee"],
   },
   {
     title: "Employees",
     url: "/employees",
     icon: UserCheck,
-    roles: ["ADMIN"],
+    roles: ["admin"],
   },
   {
     title: "Products",
     url: "/products",
     icon: Package,
-    roles: ["ADMIN", "EMPLOYEE"],
+    roles: ["admin", "employee"],
   },
   {
     title: "Orders",
     url: "/orders",
     icon: ShoppingCart,
-    roles: ["ADMIN", "EMPLOYEE"],
-  },
-  {
-    title: "Settings",
-    url: "/settings",
-    icon: Settings,
-    roles: ["ADMIN"],
+    roles: ["admin", "employee"],
   },
 ]
 
 export function AppSidebar() {
   const { user, logout } = useAuth()
+
+  const handleLogout = async () => {
+    await logout()
+  }
   const userRole = user?.role
 
   const filteredMenuItems = menuItems.filter((item) => item.roles.includes(userRole as string))
@@ -87,7 +85,9 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {filteredMenuItems.map((item) => (
+          {menuItems
+            .filter((item) => !user || item.roles.includes(user.position))
+            .map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url}>
@@ -105,11 +105,11 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-border">
         <div className="p-4">
           <div className="mb-3">
-            <p className="text-sm font-medium">{user?.name}</p>
+            <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-muted-foreground">{user?.email}</p>
-            <p className="text-xs text-accent font-medium">{user?.role}</p>
+            <p className="text-xs text-accent font-medium">{user?.position}</p>
           </div>
-          <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={logout}>
+          <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
             Sign Out
           </Button>

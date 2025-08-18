@@ -18,7 +18,7 @@ import api from "@/lib/axios"
 import { useDebounce } from "@/hooks/use-debounce"
 
 // ===== Types & Enums (keep in one place for reuse) =====
-export type OrderStatus = "TO_DO" | "IN_PROGRESS" | "DONE" | "CANCELLED"
+export type OrderStatus = "TO_DO" | "READY_TO_BE_TAKEN" | "IN_EXECUTION" | "IN_PAUSE" | "IN_PROGRESS" | "DONE" | "CANCELLED"
 export type Priority = "LOW" | "NORMAL" | "HIGH" | "URGENT"
 export type ReceivedThrough = "FACEBOOK" | "WHATSAPP" | "PHONE" | "IN_PERSON" | "EMAIL"
 
@@ -26,17 +26,22 @@ export type ClientLite = {
   _id: string
   firstName?: string
   lastName?: string
-  companyName?: string
   email?: string
+}
+
+export type CompanyLite = {
+  _id: string
+  name: string
+  cui?: string
 }
 
 export type OrderLite = {
   _id: string
-  orderNumber: string
-  customer: ClientLite | null
   dueDate?: string
   status: OrderStatus
   priority: Priority
+  customer: ClientLite | null
+  customerCompany?: CompanyLite | null
   itemsCount: number
   createdAt?: string
 }
@@ -110,8 +115,8 @@ export default function OrdersPage() {
         const raw = payload?.data ?? payload?.orders ?? payload?.items ?? []
         const list: OrderLite[] = Array.isArray(raw) ? raw.map((o: any) => ({
           _id: o._id,
-          orderNumber: o.orderNumber,
           customer: o.customer || null,
+          customerCompany: o.customerCompany || null,
           dueDate: o.dueDate,
           status: o.status,
           priority: o.priority,
@@ -175,6 +180,9 @@ export default function OrdersPage() {
               <SelectContent>
                 <SelectItem value="ALL">All statuses</SelectItem>
                 <SelectItem value="TO_DO">To do</SelectItem>
+                <SelectItem value="READY_TO_BE_TAKEN">Ready to be taken</SelectItem>
+                <SelectItem value="IN_EXECUTION">In execution</SelectItem>
+                <SelectItem value="IN_PAUSE">In pause</SelectItem>
                 <SelectItem value="IN_PROGRESS">In progress</SelectItem>
                 <SelectItem value="DONE">Done</SelectItem>
                 <SelectItem value="CANCELLED">Cancelled</SelectItem>
@@ -226,7 +234,7 @@ export default function OrdersPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order #</TableHead>
+                <TableHead>Order ID</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
@@ -253,10 +261,17 @@ export default function OrdersPage() {
               ) : (
                 rows.map((o) => (
                   <TableRow key={o._id}>
-                    <TableCell className="font-medium">{o.orderNumber}</TableCell>
+                    <TableCell className="font-medium font-mono text-xs">{o._id.slice(-8)}</TableCell>
                     <TableCell>
-                      {o.customer ? (
-                        <span>{o.customer.companyName || `${o.customer.lastName ?? ""} ${o.customer.firstName ?? ""}`}</span>
+                      {o.customerCompany ? (
+                        <div>
+                          <div className="font-medium">{o.customerCompany.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {o.customer?.firstName} {o.customer?.lastName}
+                          </div>
+                        </div>
+                      ) : o.customer ? (
+                        <span>{o.customer.firstName} {o.customer.lastName}</span>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
@@ -335,7 +350,7 @@ function QuickStatusSelect({ orderId, value, onChanged }: { orderId: string; val
     try {
       setBusy(true)
       setVal(next)
-      await api.patch(`/api/orders/${orderId}`, { status: next })
+      await api.patch(`/api/orders/${orderId}/status`, { status: next })
       onChanged?.()
     } catch (e) { /* show toast if you like */ } finally { setBusy(false) }
   }
@@ -346,6 +361,9 @@ function QuickStatusSelect({ orderId, value, onChanged }: { orderId: string; val
       </SelectTrigger2>
       <SelectContent2>
         <SelectItem2 value="TO_DO">To do</SelectItem2>
+        <SelectItem2 value="READY_TO_BE_TAKEN">Ready to be taken</SelectItem2>
+        <SelectItem2 value="IN_EXECUTION">In execution</SelectItem2>
+        <SelectItem2 value="IN_PAUSE">In pause</SelectItem2>
         <SelectItem2 value="IN_PROGRESS">In progress</SelectItem2>
         <SelectItem2 value="DONE">Done</SelectItem2>
         <SelectItem2 value="CANCELLED">Cancelled</SelectItem2>

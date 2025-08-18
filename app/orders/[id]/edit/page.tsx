@@ -17,15 +17,66 @@ export default function EditOrderPage({ params }: { params: { id: string } }) {
       try {
         setLoading(true)
         const res = await api.get(`/api/orders/${params.id}`, { signal: controller.signal })
-        setDefaults(res.data)
-      } catch (e: any) { setError(e?.response?.data?.message || "Failed to load order.") } finally { setLoading(false) }
+        const orderData = res.data
+        
+        // Transform the data to match the form structure
+        const transformedData = {
+          dueDate: orderData.dueDate ? new Date(orderData.dueDate).toISOString().slice(0, 10) : "",
+          receivedThrough: orderData.receivedThrough || "IN_PERSON",
+          status: orderData.status || "TO_DO",
+          customer: JSON.stringify({
+            clientId: orderData.customer?._id || "",
+            companyId: orderData.customerCompany?._id || undefined,
+            displayName: orderData.customerCompany 
+              ? orderData.customerCompany.name 
+              : `${orderData.customer?.firstName || ""} ${orderData.customer?.lastName || ""}`.trim(),
+            isPhysicalPerson: !orderData.customerCompany
+          }),
+          priority: orderData.priority || "NORMAL",
+          description: orderData.description || "",
+          items: (orderData.items || []).map((item: any) => ({
+            product: item.product?._id || item.product,
+            productNameSnapshot: item.productNameSnapshot || "",
+            descriptionSnapshot: item.descriptionSnapshot || "",
+            priceSnapshot: item.priceSnapshot,
+            quantity: item.quantity || 1,
+            itemStatus: item.itemStatus || "TO_DO",
+            attachments: item.attachments || [],
+            graphicsImage: item.graphicsImage || null,
+            finishedProductImage: item.finishedProductImage || null,
+            textToPrint: item.textToPrint || "",
+            editableFilePath: item.editableFilePath || "",
+            printingFilePath: item.printingFilePath || "",
+            disabledStages: item.disabledStages || [],
+            assignments: (item.assignments || []).map((assignment: any) => ({
+              stage: assignment.stage,
+              assignedTo: assignment.assignedTo?._id || assignment.assignedTo,
+              stageNotes: assignment.stageNotes || "",
+            }))
+          }))
+        }
+        
+        setDefaults(transformedData)
+      } catch (e: any) { 
+        // Don't show error for canceled requests (normal behavior when component unmounts)
+        if (e.code === 'ERR_CANCELED' || e.name === 'CanceledError') {
+          console.log('Request was canceled (component unmounted)')
+          return
+        }
+        console.error('Error loading order:', e) // Debug log
+        setError(e?.response?.data?.message || e?.message || "Failed to load order.") 
+      } finally { 
+        setLoading(false) 
+      }
     }
     load(); return () => controller.abort()
   }, [params.id])
 
-  async function handleSubmit(values: OrderFormValues2) {
+  async function handleSubmit(values: OrderFormValues2 | FormData) {
     try {
-      await api.put(`/api/orders/${params.id}`, values)
+      await api.put(`/api/orders/${params.id}`, values, {
+        headers: values instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
+      })
       router.push(`/orders/${params.id}`)
       router.refresh()
     } catch (e: any) { setError(e?.response?.data?.message || "Failed to update order.") }

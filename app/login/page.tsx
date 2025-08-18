@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2 } from "lucide-react"
+import { showApiError } from "@/lib/api-utils"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -65,11 +66,6 @@ export default function LoginPage() {
           </div>
           <CardTitle className="text-2xl font-bold text-primary">Pixeda Management</CardTitle>
           <CardDescription>Sign in to your account</CardDescription>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm">
-            <p className="font-medium text-blue-900 mb-1">Demo Credentials:</p>
-            <p className="text-blue-700">Admin: admin@pixeda.ro / secret123</p>
-            <p className="text-blue-700">Employee: employee@pixeda.ro / secret123</p>
-          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

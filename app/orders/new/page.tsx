@@ -11,10 +11,12 @@ export default function NewOrderPage() {
   const [submitting, setSubmitting] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
-  async function handleSubmit(values: OrderFormValues) {
+  async function handleSubmit(values: OrderFormValues | FormData) {
     try {
       setSubmitting(true)
-      const res = await api.post("/api/orders", values)
+      const res = await api.post("/api/orders", values, {
+        headers: values instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined
+      })
       const id = res.data?._id
       router.push(`/orders/${id}`)
       router.refresh()

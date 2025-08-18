@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/lib/auth-context"
 import { AppLayout } from "@/components/layout/app-layout"
+import { ProtectedRoute } from "@/components/protected-route"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -74,7 +75,8 @@ export default function DashboardPage() {
   const breadcrumbs = [{ label: "Dashboard" }]
 
   return (
-    <AppLayout breadcrumbs={breadcrumbs}>
+    <ProtectedRoute>
+      <AppLayout breadcrumbs={breadcrumbs}>
       <div className="space-y-6">
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -216,5 +218,6 @@ export default function DashboardPage() {
         </Card>
       </div>
     </AppLayout>
+    </ProtectedRoute>
   )
 }
