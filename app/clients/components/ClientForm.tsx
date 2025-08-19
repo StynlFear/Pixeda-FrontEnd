@@ -45,11 +45,11 @@ export type ClientFormValues = {
   phone?: string;
   whatsapp?: string;
   defaultFolderPath?: string;
-  companyIds: string[]; // <- what we actually submit to backend
+  companies: string[]; // <- what we actually submit to backend
 };
 
 // For editing, you might want to pass preselected companies with names:
-type ClientDefaultValues = Omit<ClientFormValues, "companyIds"> & {
+type ClientDefaultValues = Omit<ClientFormValues, "companies"> & {
   companies?: CompanyOption[]; // used to prefill chips
   companyIds?: string[]; // optional if you don't have names yet
 };
@@ -133,7 +133,7 @@ export default function ClientForm({
       phone: phone.trim() || undefined,
       whatsapp: whatsapp.trim() || undefined,
       defaultFolderPath: defaultFolderPath.trim() || undefined,
-      companyIds,
+      companies: companyIds,
     });
   };
 

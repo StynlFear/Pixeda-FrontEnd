@@ -13,7 +13,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { LayoutDashboard, Users, UserCheck, Package, ShoppingCart, Settings, LogOut, BriefcaseBusiness } from "lucide-react"
+import { LayoutDashboard, Users, UserCheck, Package, ShoppingCart, Settings, LogOut, BriefcaseBusiness, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
 
@@ -23,6 +23,12 @@ const menuItems = [
     url: "/dashboard",
     icon: LayoutDashboard,
     roles: ["admin", "employee"],
+  },
+  {
+    title: "Admin Insights",
+    url: "/admin-dashboard",
+    icon: BarChart3,
+    roles: ["admin"],
   },
   {
     title: "Companies",

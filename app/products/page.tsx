@@ -50,7 +50,7 @@ export default function ProductsPage() {
   // const { toast } = useToast()
 
   const page   = Number(sp.get("page")   || 1)
-  const limit  = Number(sp.get("limit")  || 10)
+  const limit  = Number(sp.get("limit")  || 8)
   const sortBy =        sp.get("sortBy") || "createdAt"
   const order  = (sp.get("order") || "desc") as "asc" | "desc"
   const qParam =        sp.get("q")      || ""

@@ -13,7 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CalendarDays, ChevronLeft, ChevronRight, Edit, Eye, Loader2, Plus } from "lucide-react"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { CalendarDays, ChevronLeft, ChevronRight, Edit, Eye, Loader2, Plus, Trash2 } from "lucide-react"
 import api from "@/lib/axios"
 import { useDebounce } from "@/hooks/use-debounce"
 
@@ -75,6 +76,7 @@ export default function OrdersPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
 
   const breadcrumbs = useMemo(
     () => [{ label: "Dashboard", href: "/dashboard" }, { label: "Orders" }],
@@ -139,6 +141,33 @@ export default function OrdersPage() {
   const totalPages = Math.max(1, Math.ceil(total / limit))
   const showingFrom = total === 0 ? 0 : (page - 1) * limit + 1
   const showingTo = Math.min(total, page * limit)
+
+  const handleDeleteOrder = async (orderId: string) => {
+    setDeletingIds(prev => new Set(prev).add(orderId))
+    
+    try {
+      await api.delete(`/api/orders/${orderId}`)
+      
+      // Remove the order from the current list
+      setRows(prev => prev.filter(order => order._id !== orderId))
+      setTotal(prev => prev - 1)
+      
+      // If this was the last item on the current page and we're not on page 1,
+      // navigate to the previous page
+      if (rows.length === 1 && page > 1) {
+        pushQuery({ page: page - 1 })
+      }
+    } catch (e: any) {
+      setError(e?.response?.data?.message || "Failed to delete order.")
+      setTimeout(() => setError(null), 5000) // Clear error after 5 seconds
+    } finally {
+      setDeletingIds(prev => {
+        const next = new Set(prev)
+        next.delete(orderId)
+        return next
+      })
+    }
+  }
 
   return (
     <AppLayout breadcrumbs={breadcrumbs}>
@@ -292,6 +321,39 @@ export default function OrdersPage() {
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/orders/${o._id}/edit`}><Edit className="h-4 w-4" /></Link>
                         </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              disabled={deletingIds.has(o._id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              {deletingIds.has(o._id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Order</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this order? This action cannot be undone and will permanently remove the order from your system.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction 
+                                onClick={() => handleDeleteOrder(o._id)}
+                                className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                              >
+                                Delete Order
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       </div>
                     </TableCell>
                   </TableRow>

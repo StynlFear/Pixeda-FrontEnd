@@ -93,26 +93,26 @@ const schema = z.object({
   items: z
     .array(
       z.object({
-        product: z.string().min(1),
-        productNameSnapshot: z.string().min(1),
+        product: z.string().min(1, "Product is required"),
+        productNameSnapshot: z.string().min(1, "Product name is required"),
         descriptionSnapshot: z.string().optional(),
         priceSnapshot: z.number().optional(),
-        quantity: z.number().min(1),
+        quantity: z.number().min(1, "Quantity must be at least 1"),
         itemStatus: z.enum(STAGES).default("TO_DO"),
-        attachments: z.array(z.string()).optional(),
-        graphicsImage: z.instanceof(File).optional().or(z.string().optional()),
-        finishedProductImage: z.instanceof(File).optional().or(z.string().optional()),
+        attachments: z.array(z.string()).optional().default([]),
+        graphicsImage: z.union([z.instanceof(File), z.string(), z.null(), z.undefined()]).optional(),
+        finishedProductImage: z.union([z.instanceof(File), z.string(), z.null(), z.undefined()]).optional(),
         textToPrint: z.string().optional(),
         editableFilePath: z.string().optional(),
         printingFilePath: z.string().optional(),
-        disabledStages: z.array(z.string()).optional(),
+        disabledStages: z.array(z.string()).optional().default([]),
         assignments: z.array(
           z.object({
             stage: z.enum(STAGES),
-            assignedTo: z.string().min(1),
+            assignedTo: z.string().optional(), // Make assignedTo optional to allow empty assignments
             stageNotes: z.string().optional(),
           })
-        ),
+        ).optional().default([]), // Make assignments array optional
       })
     )
     .min(1, "Add at least one product"),
@@ -270,7 +270,7 @@ export default function OrderForm({
         >();
         for (const a of item.assignments || []) {
           const isStageRequired = stagesRequiringAssignment.some(s => s === a.stage);
-          if (isStageRequired && a.assignedTo) {
+          if (isStageRequired && a.assignedTo && a.assignedTo.trim()) { // Check if assignedTo is not empty
             map.set(a.stage, {
               assignedTo: a.assignedTo,
               stageNotes: a.stageNotes,
@@ -278,9 +278,11 @@ export default function OrderForm({
           }
         }
 
-        // Default assignments for missing stages
-        for (const s of stagesRequiringAssignment) {
-          if (!map.has(s)) map.set(s, { assignedTo: me, stageNotes: "" });
+        // Default assignments for missing stages (only if we have a user ID)
+        if (me && me.trim()) {
+          for (const s of stagesRequiringAssignment) {
+            if (!map.has(s)) map.set(s, { assignedTo: me, stageNotes: "" });
+          }
         }
 
         assignments = Array.from(
@@ -329,11 +331,11 @@ export default function OrderForm({
       });
 
       // Handle file uploads for this item
-      if (item.graphicsImage instanceof File) {
+      if (item.graphicsImage && item.graphicsImage instanceof File) {
         formData.append(`items[${itemIndex}][graphicsImage]`, item.graphicsImage);
       }
       
-      if (item.finishedProductImage instanceof File) {
+      if (item.finishedProductImage && item.finishedProductImage instanceof File) {
         formData.append(`items[${itemIndex}][finishedProductImage]`, item.finishedProductImage);
       }
     });
@@ -364,13 +366,13 @@ export default function OrderForm({
         quantity: 1,
         itemStatus: "TO_DO" as const,
         attachments: [],
-        graphicsImage: null, // File or string
-        finishedProductImage: null, // File or string
+        graphicsImage: undefined, // Optional - added later in graphics stage
+        finishedProductImage: undefined, // Optional - added later in finishing stage
         textToPrint: "",
         editableFilePath: "",
         printingFilePath: "",
         disabledStages: [],
-        assignments: [],
+        assignments: [], // Start with empty assignments - user can fill them later
       },
     ];
     form.setValue("items", next, { shouldDirty: true });
@@ -391,6 +393,20 @@ export default function OrderForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && <div className="text-red-500 text-sm">{error}</div>}
+      
+      {/* Display form validation errors */}
+      {Object.keys(form.formState.errors).length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-red-800 text-sm font-medium mb-2">Please fix the following errors:</div>
+          <ul className="text-red-700 text-sm space-y-1">
+            {Object.entries(form.formState.errors).map(([field, error]) => (
+              <li key={field}>
+                <strong>{field}:</strong> {error?.message?.toString()}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ---------------- Order Details ---------------- */}
       <Card5>
@@ -401,6 +417,11 @@ export default function OrderForm({
           <div>
             <label className="text-sm text-muted-foreground">Due date</label>
             <Input3 type="date" {...form.register("dueDate")} />
+            {form.formState.errors.dueDate && (
+              <div className="text-red-500 text-xs mt-1">
+                {form.formState.errors.dueDate.message}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-sm text-muted-foreground">
@@ -452,6 +473,11 @@ export default function OrderForm({
                     form.setValue("customer", JSON.stringify(selection), { shouldDirty: true })
                   }
                 />
+                {form.formState.errors.customer && (
+                  <div className="text-red-500 text-xs mt-1">
+                    {form.formState.errors.customer.message}
+                  </div>
+                )}
               </div>
               {/* NEW: Create Client as MODAL */}
               <CreateClientModal
@@ -507,6 +533,12 @@ export default function OrderForm({
           {items.length === 0 && (
             <div className="text-sm text-muted-foreground">
               No products yet. Click "Add product" to select existing or "New product" to create a new one.
+            </div>
+          )}
+          
+          {form.formState.errors.items && (
+            <div className="text-red-500 text-sm bg-red-50 border border-red-200 rounded p-3">
+              <strong>Products required:</strong> {form.formState.errors.items.message}
             </div>
           )}
 
@@ -775,7 +807,7 @@ export default function OrderForm({
                             type="file"
                             accept="image/*"
                             onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
+                              const file = e.target.files?.[0] || undefined;
                               form.setValue(
                                 `items.${idx}.graphicsImage` as any,
                                 file,
@@ -784,8 +816,21 @@ export default function OrderForm({
                             }}
                           />
                           {(it as any).graphicsImage && (
-                            <div className="text-xs text-muted-foreground">
-                              Selected: {(it as any).graphicsImage.name || 'Graphics image'}
+                            <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                              <span>Selected: {(it as any).graphicsImage.name || 'Graphics image'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  form.setValue(
+                                    `items.${idx}.graphicsImage` as any,
+                                    undefined,
+                                    { shouldDirty: true }
+                                  );
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -800,7 +845,7 @@ export default function OrderForm({
                             type="file"
                             accept="image/*"
                             onChange={(e) => {
-                              const file = e.target.files?.[0] || null;
+                              const file = e.target.files?.[0] || undefined;
                               form.setValue(
                                 `items.${idx}.finishedProductImage` as any,
                                 file,
@@ -809,8 +854,21 @@ export default function OrderForm({
                             }}
                           />
                           {(it as any).finishedProductImage && (
-                            <div className="text-xs text-muted-foreground">
-                              Selected: {(it as any).finishedProductImage.name || 'Finished product image'}
+                            <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                              <span>Selected: {(it as any).finishedProductImage.name || 'Finished product image'}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  form.setValue(
+                                    `items.${idx}.finishedProductImage` as any,
+                                    undefined,
+                                    { shouldDirty: true }
+                                  );
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -840,19 +898,19 @@ export default function OrderForm({
                             );
                             const current =
                               assIdx >= 0
-                                ? it.assignments[assIdx].assignedTo
-                                : resolvedMe || "";
+                                ? it.assignments[assIdx].assignedTo || ""
+                                : "";
                             const currentNotes =
                               assIdx >= 0
                                 ? it.assignments[assIdx].stageNotes || ""
                                 : "";
                             if (assIdx < 0) {
-                              // lazily add default if missing
+                              // lazily add default if missing - but with empty assignedTo
                               const clone = [
                                 ...it.assignments,
                                 {
                                   stage,
-                                  assignedTo: resolvedMe || "",
+                                  assignedTo: "", // Start with empty assignment
                                   stageNotes: "",
                                 },
                               ];
@@ -934,7 +992,7 @@ export default function OrderForm({
                                       else
                                         next.push({
                                           stage,
-                                          assignedTo: resolvedMe || "",
+                                          assignedTo: "", // Allow empty assignment
                                           stageNotes: e.target.value,
                                         });
                                       form.setValue(
@@ -1155,7 +1213,7 @@ function AssigneeSelect({
         className="w-full justify-between"
         onClick={() => setOpen(!open)}
       >
-        {selected ? fullName(selected) : "Select employee…"}
+        {selected ? fullName(selected) : "Select employee (optional)…"}
       </Button3>
 
       {open && (
@@ -1166,6 +1224,16 @@ function AssigneeSelect({
               <CommandList>
                 <CommandEmpty>No employee found.</CommandEmpty>
                 <CommandGroup>
+                  {/* Add option to clear selection */}
+                  <CommandItem
+                    value="clear-selection"
+                    onSelect={() => {
+                      onChange(""); // Set to empty string
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="text-muted-foreground italic">No assignment</span>
+                  </CommandItem>
                   {employees.map((e) => {
                     // valoare UNICĂ pt. cmdk (id + nume, ca să fie și căutabilă)
                     const cmdValue = `${fullName(e)} ${e._id}`;

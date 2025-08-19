@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Request interceptor to attach access token
     const requestInterceptor = api.interceptors.request.use((config) => {
       // Don't add token to refresh endpoint
-      if (accessToken && !config.url?.includes('/auth/refresh')) {
+      if (accessToken && !config.url?.includes('/api/auth/refresh')) {
         config.headers.Authorization = `Bearer ${accessToken}`
       }
       return config
@@ -51,12 +51,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const originalRequest = error.config
 
         // If we get a 401 and haven't already tried to refresh
-        if (error.response?.status === 401 && !originalRequest._retry && accessToken && !originalRequest.url?.includes('/auth/refresh')) {
+        if (error.response?.status === 401 && !originalRequest._retry && accessToken && !originalRequest.url?.includes('/api/auth/refresh')) {
           originalRequest._retry = true
 
           try {
             // Try to refresh the token using the HTTP-only cookie
-            const refreshResponse = await api.post("/auth/refresh")
+            const refreshResponse = await api.post("/api/auth/refresh")
             
             if (refreshResponse.data?.accessToken) {
               // Update access token in state
@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("CheckAuth: Current cookies:", document.cookie)
       
       // Try to refresh token first (this handles page refresh scenario)
-      const refreshResponse = await api.post("/auth/refresh")
+      const refreshResponse = await api.post("/api/auth/refresh")
       
       console.log("CheckAuth: Refresh response:", refreshResponse.status)
       console.log("CheckAuth: Refresh data:", refreshResponse.data)
@@ -155,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log("Attempting login with:", email)
 
-      const response = await api.post("/auth/login", {
+      const response = await api.post("/api/auth/login", {
         email,
         password,
       })
@@ -190,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await api.post("/auth/logout")
+      await api.post("/api/auth/logout")
     } catch (error) {
       console.error("Logout error:", error)
     } finally {

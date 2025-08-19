@@ -80,7 +80,7 @@ export default function EditClientPage({ params }: Props) {
       whatsapp: values.whatsapp?.trim() || undefined,
       defaultFolderPath: values.defaultFolderPath?.trim() || undefined,
       // IMPORTANT: backend expects `companies` (array of ObjectId strings)
-      companies: values.companyIds ?? [],
+      companies: values.companies ?? [],
     }
 
     // drop undefined
