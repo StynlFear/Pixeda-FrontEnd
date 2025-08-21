@@ -21,7 +21,7 @@ export default function EditOrderPage({ params }: { params: { id: string } }) {
         
         // Transform the data to match the form structure
         const transformedData = {
-          dueDate: orderData.dueDate ? new Date(orderData.dueDate).toISOString().slice(0, 10) : "",
+          dueDate: orderData.dueDate ? new Date(orderData.dueDate).toISOString().slice(0, 10) : undefined, // Make due date truly optional
           receivedThrough: orderData.receivedThrough || "IN_PERSON",
           status: orderData.status || "TO_DO",
           customer: JSON.stringify({
@@ -50,7 +50,7 @@ export default function EditOrderPage({ params }: { params: { id: string } }) {
             disabledStages: item.disabledStages || [],
             assignments: (item.assignments || []).map((assignment: any) => ({
               stage: assignment.stage,
-              assignedTo: assignment.assignedTo?._id || assignment.assignedTo,
+              assignedTo: assignment.assignedTo?._id || assignment.assignedTo || "", // Allow empty assignedTo
               stageNotes: assignment.stageNotes || "",
             }))
           }))
