@@ -216,14 +216,13 @@ export default function ProductForm({
         {/* Product code */}
         <div>
           <label className="block text-sm font-medium mb-1" htmlFor="productCode">
-            Product code *
+            Product code (optional)
           </label>
           <Input
             id="productCode"
             value={form.productCode}
             onChange={onChange("productCode")}
             placeholder="BAN-VINYL-L"
-            required
             disabled={submitting}
           />
         </div>
