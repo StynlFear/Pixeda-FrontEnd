@@ -58,7 +58,7 @@ export default function OrdersPage() {
   const sp = useSearchParams()
 
   const page   = Number(sp.get("page")   || 1)
-  const limit  = Number(sp.get("limit")  || 10)
+  const limit  = Number(sp.get("limit")  || 8)
   const sortBy =        sp.get("sortBy") || "createdAt"
   const order  = (sp.get("order") || "desc") as "asc" | "desc"
   const qParam =        sp.get("q")      || ""
@@ -265,6 +265,7 @@ export default function OrdersPage() {
               <TableRow>
                 <TableHead>Order ID</TableHead>
                 <TableHead>Client</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead>Due</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Priority</TableHead>
@@ -275,17 +276,17 @@ export default function OrdersPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
                     <div className="inline-flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Loading orders…</div>
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-red-500">{error}</TableCell>
+                  <TableCell colSpan={8} className="py-8 text-center text-red-500">{error}</TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">No orders found</TableCell>
+                  <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">No orders found</TableCell>
                 </TableRow>
               ) : (
                 rows.map((o) => (
@@ -301,6 +302,18 @@ export default function OrdersPage() {
                         </div>
                       ) : o.customer ? (
                         <span>{o.customer.firstName} {o.customer.lastName}</span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {o.createdAt ? (
+                        <div className="text-sm">
+                          <div>{new Date(o.createdAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}

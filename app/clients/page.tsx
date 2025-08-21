@@ -51,7 +51,7 @@ export default function ClientsPage() {
 
   // query params (server-side pagination-ready)
   const [page, setPage] = useState<number>(Number(searchParams.get("page") || 1))
-  const [limit] = useState<number>(10)
+  const [limit] = useState<number>(8)
   const [sort] = useState<string>("-createdAt")
 
   const [searchInput, setSearchInput] = useState(searchParams.get("search") || "")

@@ -637,8 +637,16 @@ export default function AdminDashboard() {
                             <Progress value={employee.completionRate} className="h-2" />
                           </div>
                           <span className="text-xs text-muted-foreground w-16">
-                            {employee.completedItems}/{employee.totalAssignments}
+                            {employee.completedAssignments}/{employee.totalAssignments}
                           </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-2 text-xs text-muted-foreground">
+                          <div>
+                            <span>Active: {employee.activeAssignments}</span>
+                          </div>
+                          <div>
+                            <span>Total Time: {employee.totalTimeSpentFormatted?.formatted?.human}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -650,25 +658,104 @@ export default function AdminDashboard() {
               <Card>
                 <CardHeader>
                   <CardTitle>Employee Performance</CardTitle>
-                  <CardDescription>Average turnaround time per employee</CardDescription>
+                  <CardDescription>Overall performance metrics per employee</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart data={employeeInsights.employeeTurnaroundTime}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="_id.employeeName" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={100}
-                      />
-                      <YAxis />
-                      <Tooltip 
-                        formatter={(value) => [formatDuration(Number(value)), "Avg Turnaround"]}
-                      />
-                      <Bar dataKey="avgTurnaroundTime" fill="#8884d8" />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div className="space-y-6">
+                    {employeeInsights.employeeTurnaroundTime.map((employee: any) => (
+                      <div key={employee._id.employeeId} className="space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b">
+                          <div>
+                            <h4 className="font-medium">{employee._id.employeeName}</h4>
+                            <p className="text-sm text-muted-foreground">
+                              {employee.totalActiveAssignments} active assignments • {employee.totalCompletedAssignments} completed
+                              {employee.totalWorkTimeFormatted?.formatted?.human && (
+                                <span> • Total time: {employee.totalWorkTimeFormatted.formatted.human}</span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            {employee.overallAvgCompletionTimeFormatted?.formatted?.human ? (
+                              <p className="font-medium">Avg Completion: {employee.overallAvgCompletionTimeFormatted.formatted.human}</p>
+                            ) : (
+                              <p className="font-medium text-muted-foreground">No completed assignments yet</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <p className="text-sm font-medium text-gray-700">Current Stage Assignments:</p>
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+                            {employee.stagePerformance?.map((stage: any) => (
+                              <div key={stage.stage} className="text-center p-2 bg-blue-50 rounded border">
+                                <p className="text-xs font-medium text-blue-800">{stage.stage}</p>
+                                <p className="text-sm font-semibold text-blue-600">
+                                  {stage.activeAssignments} active
+                                </p>
+                                <p className="text-xs text-green-600">
+                                  {stage.completedAssignments} done
+                                </p>
+                                {stage.avgCurrentAssignmentAgeFormatted?.formatted?.human && (
+                                  <p className="text-xs text-gray-600">
+                                    Age: {stage.avgCurrentAssignmentAgeFormatted.formatted.human}
+                                  </p>
+                                )}
+                                {stage.avgCompletionTimeFormatted?.formatted?.human && (
+                                  <p className="text-xs text-purple-600">
+                                    Avg: {stage.avgCompletionTimeFormatted.formatted.human}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {employee.stagePerformance?.some((stage: any) => stage.avgCurrentAssignmentAgeFormatted?.formatted?.human) && (
+                            <div className="mt-3 p-3 bg-gray-100 rounded">
+                              <p className="text-xs text-gray-600">
+                                <strong>Note:</strong> "Age" shows how long current assignments have been with this employee. 
+                                "Avg" shows average completion time for finished assignments in each stage.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Employee Activity */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Employee Assignment Status</CardTitle>
+                  <CardDescription>All employees and their assignment completion status</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {employeeInsights.employeeActivity.map((employee: any) => (
+                      <div key={employee._id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-3 h-3 rounded-full ${!employee.isActive ? 'bg-green-500' : 'bg-orange-500'}`}></div>
+                          <div>
+                            <p className="font-medium">{employee.firstName} {employee.lastName}</p>
+                            <p className="text-sm text-muted-foreground">{employee.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={!employee.isActive ? "default" : "secondary"}>
+                            {employee.position}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {!employee.isActive ? "Assignments Done" : "Has Pending Assignments"}
+                          </p>
+                          {employee.lastActivity && (
+                            <p className="text-xs text-muted-foreground">
+                              Last: {new Date(employee.lastActivity).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             </>
