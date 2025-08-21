@@ -231,7 +231,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                             <span className="text-sm font-medium text-muted-foreground">Graphics Image:</span>
                             <div className="mt-1 border rounded p-2 bg-white">
                               <img 
-                                src={`${API_BASE_URL}/api/uploads/${item.graphicsImage.replace(/\\/g, '/')}`} 
+                                src={`${API_BASE_URL}api/uploads/${item.graphicsImage.replace(/\\/g, '/')}`} 
                                 alt="Graphics" 
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
@@ -251,7 +251,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                             <span className="text-sm font-medium text-muted-foreground">Finished Product Image:</span>
                             <div className="mt-1 border rounded p-2 bg-white">
                               <img 
-                                src={`${API_BASE_URL}/api/uploads/${item.finishedProductImage.replace(/\\/g, '/')}`} 
+                                src={`${API_BASE_URL}api/uploads/${item.finishedProductImage.replace(/\\/g, '/')}`} 
                                 alt="Finished Product" 
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
