@@ -1,6 +1,3 @@
-// =============================
-// app/orders/page.tsx — Orders index with pagination + inline status change
-// =============================
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
@@ -17,6 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CalendarDays, ChevronLeft, ChevronRight, Edit, Eye, Loader2, Plus, Trash2 } from "lucide-react"
 import api from "@/lib/axios"
 import { useDebounce } from "@/hooks/use-debounce"
+import { Suspense } from "react";
 
 // ===== Types & Enums (keep in one place for reuse) =====
 export type OrderStatus = "TO_DO" | "READY_TO_BE_TAKEN" | "IN_EXECUTION" | "IN_PAUSE" | "IN_PROGRESS" | "DONE" | "CANCELLED"
@@ -53,7 +51,7 @@ export type OrderLite = {
   | { orders: any[]; total: number; page: number; limit: number }
   | { items: any[]; total: number; page: number; limit: number }
 
-export default function OrdersPage() {
+export function OrdersPageClient() {
   const router = useRouter()
   const sp = useSearchParams()
 
@@ -445,4 +443,13 @@ function QuickStatusSelect({ orderId, value, onChanged }: { orderId: string; val
       </SelectContent2>
     </Select2>
   )
+}
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div className="p-6 text-muted-foreground">Loading orders…</div>
+    }>
+      <OrdersPageClient />
+    </Suspense>
+  );
 }
