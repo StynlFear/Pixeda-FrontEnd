@@ -232,7 +232,14 @@ export default function ViewClientPage({ params }: { params: { id: string } }) {
                   <div className="text-sm text-muted-foreground">WhatsApp</div>
                   <div className="text-base">
                     {client.whatsapp ? (
-                      <a className="underline" href={`tel:${client.whatsapp}`}>{client.whatsapp}</a>
+                      <a 
+                        className="underline" 
+                        href={`https://wa.me/${client.whatsapp.replace(/\s+/g, '').replace(/^\+/, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {client.whatsapp}
+                      </a>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
