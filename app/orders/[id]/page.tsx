@@ -5,7 +5,7 @@ import { Badge as Badge2 } from "@/components/ui/badge"
 import { Button as Button2 } from "@/components/ui/button"
 import { Card as Card4, CardContent as CardContent4, CardHeader as CardHeader4, CardTitle as CardTitle4, CardDescription as CardDescription4 } from "@/components/ui/card"
 import { Select as Select3, SelectContent as SelectContent3, SelectItem as SelectItem3, SelectTrigger as SelectTrigger3, SelectValue as SelectValue3 } from "@/components/ui/select"
-import { Download, Edit as Edit2 } from "lucide-react"
+import { Edit as Edit2 } from "lucide-react"
 import api from "@/lib/axios"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
@@ -32,26 +32,6 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
     setOrder((prev: any) => ({ ...prev, items: prev.items.map((it: any) => it._id === itemId ? { ...it, itemStatus: next } : it) }))
   }
 
-  async function exportOrderAsPDF() {
-    try {
-      const response = await api.get(`/api/orders/${params.id}/pdf`, {
-        responseType: 'blob'
-      })
-      
-      // Create blob link to download
-      const url = window.URL.createObjectURL(new Blob([response.data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.setAttribute('download', `order-${order.orderNumber}.pdf`)
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
-    }
-  }
-
   if (loading || !order) return <AppLayout4 breadcrumbs={[{label: "Orders", href: "/orders"},{label: params.id}]}>Loading…</AppLayout4>
 
   return (
@@ -67,7 +47,6 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button2 onClick={exportOrderAsPDF}> <Download className="mr-2 h-4 w-4"/> Export PDF</Button2>
           <Button2 asChild><a href={`/orders/${order._id}/edit`}><Edit2 className="mr-2 h-4 w-4"/> Edit</a></Button2>
         </div>
       </div>
@@ -252,7 +231,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                             <span className="text-sm font-medium text-muted-foreground">Graphics Image:</span>
                             <div className="mt-1 border rounded p-2 bg-white">
                               <img 
-                                src={`${API_BASE_URL}/api/uploads/${item.graphicsImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
+                                src={`${API_BASE_URL}api/uploads/${item.graphicsImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
                                 alt="Graphics" 
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
