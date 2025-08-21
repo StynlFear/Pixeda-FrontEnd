@@ -180,13 +180,13 @@ export default function AdminDashboard() {
         financialResponse,
         auditResponse
       ] = await Promise.all([
-        api.get("/insights/dashboard", { params }),
-        api.get("/insights/orders", { params }),
-        api.get("/insights/employees", { params }),
-        api.get("/insights/clients", { params }),
-        api.get("/insights/products", { params }),
-        api.get("/insights/financial", { params }),
-        api.get("/insights/audit", { params })
+        api.get("api/insights/dashboard", { params }),
+        api.get("api/insights/orders", { params }),
+        api.get("api/insights/employees", { params }),
+        api.get("api/insights/clients", { params }),
+        api.get("api/insights/products", { params }),
+        api.get("api/insights/financial", { params }),
+        api.get("api/insights/audit", { params })
       ])
 
       setDashboardData(dashboardResponse.data.data)
