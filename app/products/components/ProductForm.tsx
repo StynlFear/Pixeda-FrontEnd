@@ -106,7 +106,6 @@ export default function ProductForm({
 
     // Validation
     if (!form.productName.trim()) return setLocalError("Product name is required.")
-    if (!form.productCode.trim()) return setLocalError("Product code is required.")
 
     const numericPrice =
       form.price.trim() === "" ? undefined : Number(parseFloat(form.price.replace(",", ".")))
