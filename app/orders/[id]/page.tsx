@@ -8,6 +8,8 @@ import { Select as Select3, SelectContent as SelectContent3, SelectItem as Selec
 import { Download, Edit as Edit2 } from "lucide-react"
 import api from "@/lib/axios"
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+
 // Item stage enum per spec
 export type ItemStage = "TO_DO" | "GRAPHICS" | "PRINTING" | "CUTTING" | "FINISHING" | "PACKING" | "DONE" | "STANDBY" | "CANCELLED"
 
@@ -230,7 +232,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                             <span className="text-sm font-medium text-muted-foreground">Graphics Image:</span>
                             <div className="mt-1 border rounded p-2 bg-white">
                               <img 
-                                src={`http://localhost:5000/api/uploads/${item.graphicsImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
+                                src={`${API_BASE_URL}/api/uploads/${item.graphicsImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
                                 alt="Graphics" 
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
@@ -250,7 +252,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                             <span className="text-sm font-medium text-muted-foreground">Finished Product Image:</span>
                             <div className="mt-1 border rounded p-2 bg-white">
                               <img 
-                                src={`http://localhost:5000/api/uploads/${item.finishedProductImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
+                                src={`${API_BASE_URL}/api/uploads/${item.finishedProductImage.replace(/\\/g, '/').replace(/^uploads\//, '')}`} 
                                 alt="Finished Product" 
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
@@ -275,7 +277,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                               <div key={attIdx} className="flex items-center gap-2 p-2 bg-white rounded border text-xs">
                                 <span className="flex-1 font-mono">{attachment}</span>
                                 <a 
-                                  href={`http://localhost:5000/api/uploads/${attachment}`} 
+                                  href={`${API_BASE_URL}/api/uploads/${attachment}`} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   className="text-blue-600 hover:text-blue-800 underline"

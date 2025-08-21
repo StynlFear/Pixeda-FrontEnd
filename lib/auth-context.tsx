@@ -109,7 +109,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log("CheckAuth: New access token set, getting user info...")
         
         // Get user info with explicit authorization header
-        const userResponse = await axios.get("http://localhost:5000/api/auth/me", {
+        const userResponse = await axios.get(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"}/api/auth/me`, {
           headers: {
             'Authorization': `Bearer ${newAccessToken}`
           },
