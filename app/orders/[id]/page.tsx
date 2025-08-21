@@ -8,7 +8,7 @@ import { Select as Select3, SelectContent as SelectContent3, SelectItem as Selec
 import { Download, Edit as Edit2 } from "lucide-react"
 import api from "@/lib/axios"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL!;
 
 // Item stage enum per spec
 export type ItemStage = "TO_DO" | "GRAPHICS" | "PRINTING" | "CUTTING" | "FINISHING" | "PACKING" | "DONE" | "STANDBY" | "CANCELLED"

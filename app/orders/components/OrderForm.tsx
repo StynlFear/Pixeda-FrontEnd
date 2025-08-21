@@ -147,7 +147,7 @@ export default function OrderForm({
         const token =
           typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
-        const res = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"}/api/employees`, {
+        const res = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL!}/api/employees`, {
           // trimite header-ul dacă ai JWT; dacă nu, rămâne fără
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
           // dacă backendul tău NU suportă acești parametri, scoate-i
