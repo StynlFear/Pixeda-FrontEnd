@@ -184,21 +184,59 @@ export default function DashboardPage() {
               })
             } else {
               // For non-admin users, check assignments
-              if (!item.assignments || !Array.isArray(item.assignments)) continue
+              if (!item.assignments || !Array.isArray(item.assignments)) {
+                // If no assignments exist but item is in TO_DO stage, show it to all users
+                // This handles cases where items are moved back to TO_DO without proper assignments
+                if (currentStage === 'TO_DO') {
+                  tasks.push({
+                    orderId: order._id,
+                    itemId: item._id,
+                    assignmentId: item._id, // Use item ID as fallback
+                    orderNumber: order.orderNumber || `Order ${order._id}`,
+                    productName: item.productNameSnapshot || 'Unknown Product',
+                    quantity: item.quantity || 1,
+                    client: clientName,
+                    dueDate: order.dueDate || '',
+                    currentStage: currentStage,
+                    priority: order.priority || 'NORMAL',
+                    assignedTo: 'Available for assignment'
+                  })
+                }
+                continue
+              }
 
               // Find the assignment for the current stage
               const currentAssignment = item.assignments.find((assignment: any) => assignment.stage === currentStage)
               
-              // If no assignment for current stage, skip this item
-              if (!currentAssignment) continue
+              // If no assignment for current stage
+              if (!currentAssignment) {
+                // For TO_DO stage, show items without assignments as available for pickup
+                if (currentStage === 'TO_DO') {
+                  tasks.push({
+                    orderId: order._id,
+                    itemId: item._id,
+                    assignmentId: item._id, // Use item ID as fallback
+                    orderNumber: order.orderNumber || `Order ${order._id}`,
+                    productName: item.productNameSnapshot || 'Unknown Product',
+                    quantity: item.quantity || 1,
+                    client: clientName,
+                    dueDate: order.dueDate || '',
+                    currentStage: currentStage,
+                    priority: order.priority || 'NORMAL',
+                    assignedTo: 'Available for assignment'
+                  })
+                }
+                continue
+              }
 
               // Handle both object and string formats for assignedTo
               const assignedToId = typeof currentAssignment.assignedTo === 'object' && currentAssignment.assignedTo 
                 ? currentAssignment.assignedTo._id 
                 : currentAssignment.assignedTo
 
-              // Filter: only show items assigned to current user
-              if (assignedToId !== user?._id) continue
+              // For TO_DO stage, show all items to all users (they can pick them up)
+              // For other stages, only show items assigned to current user
+              if (currentStage !== 'TO_DO' && assignedToId !== user?._id) continue
 
               tasks.push({
                 orderId: order._id,
@@ -326,7 +364,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-accent">{activeItems.length}</div>
-                <p className="text-xs text-muted-foreground">{isAdmin ? 'Active assignments' : 'Active items assigned to you'}</p>
+                <p className="text-xs text-muted-foreground">{isAdmin ? 'Active assignments' : 'Your assignments + available items'}</p>
               </CardContent>
             </Card>
           </div>
@@ -340,7 +378,7 @@ export default function DashboardPage() {
                   <CardDescription>
                     {isAdmin 
                       ? 'All items in the system organized by workflow stage' 
-                      : 'Items assigned to you organized by workflow stage'
+                      : 'Items assigned to you and available TO_DO items organized by workflow stage'
                     }
                   </CardDescription>
                 </div>

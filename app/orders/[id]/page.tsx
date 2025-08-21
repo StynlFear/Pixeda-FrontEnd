@@ -32,6 +32,26 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
     setOrder((prev: any) => ({ ...prev, items: prev.items.map((it: any) => it._id === itemId ? { ...it, itemStatus: next } : it) }))
   }
 
+  async function exportOrderAsPDF() {
+    try {
+      const response = await api.get(`/api/orders/${params.id}/pdf`, {
+        responseType: 'blob'
+      })
+      
+      // Create blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `order-${order.orderNumber}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      console.error('Error exporting PDF:', error)
+    }
+  }
+
   if (loading || !order) return <AppLayout4 breadcrumbs={[{label: "Orders", href: "/orders"},{label: params.id}]}>Loading…</AppLayout4>
 
   return (
@@ -47,7 +67,7 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button2 asChild><a href={`/api/orders/${order._id}/export`}> <Download className="mr-2 h-4 w-4"/> Export PDF</a></Button2>
+          <Button2 onClick={exportOrderAsPDF}> <Download className="mr-2 h-4 w-4"/> Export PDF</Button2>
           <Button2 asChild><a href={`/orders/${order._id}/edit`}><Edit2 className="mr-2 h-4 w-4"/> Edit</a></Button2>
         </div>
       </div>
