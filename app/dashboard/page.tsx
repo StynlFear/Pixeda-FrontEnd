@@ -260,6 +260,15 @@ function ExpandableTaskCard({
         <div>
           <p className="font-medium text-xs leading-tight truncate">{item.productName}</p>
           <p className="text-xs text-muted-foreground truncate">Qty: {item.quantity} • {item.client}</p>
+          {/* Assignment Status - Always Visible */}
+          <div className="flex items-center gap-1 text-xs mt-1">
+            <User className="h-3 w-3" />
+            <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+              {item.assignedTo === 'Not assigned to anyone' ? 'Available for pickup' : 
+               item.assignedTo === user?._id ? 'Assigned to you' : 
+               item.assignedTo}
+            </span>
+          </div>
         </div>
 
         {/* Expanded Details - All Original Information */}
