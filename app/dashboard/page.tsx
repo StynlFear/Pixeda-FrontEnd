@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
-import { Clock, AlertTriangle, CheckCircle, Package, Calendar, User, Loader2, FileText, Info, Target, ChevronDown, ChevronUp, Eye, EyeOff, Grid, List } from "lucide-react"
+import { Clock, AlertTriangle, CheckCircle, Package, Calendar, User, Loader2, FileText, Info, Target, ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react"
 import { PRIORITY_LABELS } from "@/lib/constants"
 import api from "@/lib/axios"
 
@@ -158,21 +158,30 @@ function StageUpdateSelect({
     }
   }
 
+  // Filter out disabled stages from the dropdown
+  const availableStages = [
+    { value: "TO_DO", label: "To Do" },
+    { value: "GRAPHICS", label: "Graphics" },
+    { value: "PRINTING", label: "Printing" },
+    { value: "CUTTING", label: "Cutting" },
+    { value: "FINISHING", label: "Finishing" },
+    { value: "PACKING", label: "Packing" },
+    { value: "DONE", label: "Done" },
+    { value: "STANDBY", label: "Standby" },
+    { value: "CANCELLED", label: "Cancelled" }
+  ].filter(stage => !item.disabledStages?.includes(stage.value as ItemStage))
+
   return (
     <Select value={item.currentStage} onValueChange={handleStageChange} disabled={updating}>
-      <SelectTrigger className="w-full text-xs h-7">
+      <SelectTrigger className="w-full text-xs h-6">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="TO_DO">To Do</SelectItem>
-        <SelectItem value="GRAPHICS">Graphics</SelectItem>
-        <SelectItem value="PRINTING">Printing</SelectItem>
-        <SelectItem value="CUTTING">Cutting</SelectItem>
-        <SelectItem value="FINISHING">Finishing</SelectItem>
-        <SelectItem value="PACKING">Packing</SelectItem>
-        <SelectItem value="DONE">Done</SelectItem>
-        <SelectItem value="STANDBY">Standby</SelectItem>
-        <SelectItem value="CANCELLED">Cancelled</SelectItem>
+        {availableStages.map(stage => (
+          <SelectItem key={stage.value} value={stage.value}>
+            {stage.label}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   )
@@ -200,8 +209,8 @@ function TaskHighlight({
   )
 }
 
-// Compact Task Card Component
-function CompactTaskCard({ 
+// Expandable Task Card Component
+function ExpandableTaskCard({ 
   item, 
   onStatusUpdate, 
   handleSelfAssignment, 
@@ -226,9 +235,9 @@ function CompactTaskCard({
       }`}
     >
       <div className="space-y-2">
-        {/* Compact Header - Always Visible */}
+        {/* Header with Order Number, Priority, and Expand Button */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="flex items-center gap-1 flex-1 min-w-0">
             <span className="text-xs font-mono text-primary font-bold truncate">{item.orderNumber}</span>
             <Badge
               variant="secondary"
@@ -240,50 +249,38 @@ function CompactTaskCard({
           <Button
             variant="ghost"
             size="sm"
-            className="h-6 w-6 p-0 flex-shrink-0"
+            className="h-5 w-5 p-0 flex-shrink-0"
             onClick={() => setExpanded(!expanded)}
           >
             {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </Button>
         </div>
 
-        {/* Product Info - Always Visible */}
+        {/* Basic Product Info - Always Visible */}
         <div>
-          <p className="font-medium text-sm truncate">{item.productName}</p>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>Qty: {item.quantity} • {item.client}</span>
-            <span className={`${isTaskOverdue(item.dueDate) ? 'text-red-600 font-bold' : isTaskDueSoon(item.dueDate) ? 'text-orange-600 font-medium' : ''}`}>
-              {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due'}
-            </span>
-          </div>
+          <p className="font-medium text-xs leading-tight truncate">{item.productName}</p>
+          <p className="text-xs text-muted-foreground truncate">Qty: {item.quantity} • {item.client}</p>
         </div>
 
-        {/* Assignment Status - Always Visible */}
-        <div className="flex items-center justify-between text-xs">
-          <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-            {item.assignedTo === 'Not assigned to anyone' ? '🔄 Available' : '👤 Assigned to you'}
-          </span>
-          {item.isUnassigned && !isAdmin && (
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-xs h-5 px-2"
-              onClick={async () => {
-                try {
-                  await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
-                } catch (error) {
-                  console.error("Failed to assign task:", error)
-                }
-              }}
-            >
-              Take
-            </Button>
-          )}
-        </div>
-
-        {/* Expanded Details */}
+        {/* Expanded Details - All Original Information */}
         {expanded && (
-          <div className="space-y-2 pt-2 border-t border-gray-100">
+          <div className="space-y-3">
+            {/* Product Information */}
+            <div className="space-y-1">
+              {item.productType && (
+                <p className="text-xs text-muted-foreground">
+                  Type: <span className="font-medium">{item.productType}</span>
+                </p>
+              )}
+              {(item.productSize || item.productMaterial) && (
+                <p className="text-xs text-muted-foreground">
+                  {item.productSize && `Size: ${item.productSize}`}
+                  {item.productSize && item.productMaterial && ' • '}
+                  {item.productMaterial && `Material: ${item.productMaterial}`}
+                </p>
+              )}
+            </div>
+
             {/* Current Stage Instructions */}
             <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
               <div className="flex items-start gap-2">
@@ -295,13 +292,18 @@ function CompactTaskCard({
               </div>
             </div>
 
-            {/* Special Instructions */}
+            {/* Priority Context */}
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">{getPriorityContext(item.priority)}</span>
+            </div>
+
+            {/* Special Instructions and Notes */}
             {(item.specialInstructions || item.stageNotes || item.orderNotes || item.textToPrint || item.itemDescription) && (
               <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
                 <div className="flex items-start gap-2">
                   <Info className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-amber-900">Notes & Instructions:</p>
+                    <p className="text-xs font-medium text-amber-900">Instructions & Notes:</p>
                     {item.stageNotes && (
                       <p className="text-xs text-amber-700 font-medium bg-amber-100 p-1 rounded">
                         <strong>🎯 Assignment Notes:</strong> {item.stageNotes}
@@ -324,8 +326,79 @@ function CompactTaskCard({
               </div>
             )}
 
-            {/* Actions */}
-            <div className="space-y-1">
+            {/* Product Description */}
+            {item.productDescription && (
+              <div className="bg-gray-50 p-2 rounded-md border border-gray-100">
+                <div className="flex items-start gap-2">
+                  <FileText className="h-3 w-3 text-gray-600 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-gray-900">Product Details:</p>
+                    <p className="text-xs text-gray-700">{item.productDescription}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Due Date */}
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Calendar className="h-3 w-3" />
+              <span className={isTaskOverdue(item.dueDate) ? 'text-red-600 font-bold' : isTaskDueSoon(item.dueDate) ? 'text-orange-600 font-medium' : ''}>
+                Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due date'}
+              </span>
+              {isTaskOverdue(item.dueDate) && <span className="text-red-600 text-xs">⚠️ OVERDUE</span>}
+              {isTaskDueSoon(item.dueDate) && !isTaskOverdue(item.dueDate) && <span className="text-orange-600 text-xs">⏰ DUE SOON</span>}
+            </div>
+
+            {/* Assignment Status */}
+            <div className="flex items-center gap-1 text-xs">
+              <User className="h-3 w-3" />
+              <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                {item.assignedTo === 'Not assigned to anyone' ? 'Available for pickup' : 
+                 item.assignedTo === user?._id ? 'Assigned to you' : 
+                 item.assignedTo}
+              </span>
+            </div>
+
+            {/* Next Step Preview */}
+            {item.nextStage && !item.disabledStages?.includes(item.nextStage) && (
+              <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded-md border border-green-100">
+                <p className="font-medium text-green-900">Next: {item.nextStage.replace('_', ' ')}</p>
+                <p className="text-green-700">{getStageInstructions(item.nextStage)}</p>
+              </div>
+            )}
+
+            {/* Disabled Stages Info */}
+            {item.disabledStages && item.disabledStages.length > 0 && (
+              <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-md border border-gray-100">
+                <p className="font-medium text-gray-900">Skipped Stages:</p>
+                <p className="text-gray-700">
+                  {item.disabledStages.map(stage => stage.replace('_', ' ')).join(', ')} 
+                  - These stages are not needed for this item
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="space-y-1 pt-2 border-t border-gray-100">
+              {/* Show assignment button for unassigned items */}
+              {item.isUnassigned && !isAdmin && (
+                <Button 
+                  size="sm" 
+                  variant="default" 
+                  className="text-xs h-7 w-full bg-blue-600 hover:bg-blue-700"
+                  onClick={async () => {
+                    try {
+                      await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
+                    } catch (error) {
+                      console.error("Failed to assign task:", error)
+                    }
+                  }}
+                >
+                  🎯 Take This Task
+                </Button>
+              )}
+              
+              {/* Stage Update Dropdown */}
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-700">Update Stage:</label>
                 <StageUpdateSelect 
@@ -333,6 +406,7 @@ function CompactTaskCard({
                   onStatusUpdate={onStatusUpdate}
                 />
               </div>
+              
               <Button 
                 size="sm" 
                 variant="ghost" 
@@ -342,6 +416,47 @@ function CompactTaskCard({
                 📋 View Full Order
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Always Visible Action Buttons (for collapsed state) */}
+        {!expanded && (
+          <div className="space-y-1 pt-1 border-t border-gray-100">
+            {/* Show assignment button for unassigned items */}
+            {item.isUnassigned && !isAdmin && (
+              <Button 
+                size="sm" 
+                variant="default" 
+                className="text-xs h-6 w-full bg-blue-600 hover:bg-blue-700"
+                onClick={async () => {
+                  try {
+                    await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
+                  } catch (error) {
+                    console.error("Failed to assign task:", error)
+                  }
+                }}
+              >
+                🎯 Take
+              </Button>
+            )}
+            
+            {/* Stage Update Dropdown */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-gray-700">Stage:</label>
+              <StageUpdateSelect 
+                item={item} 
+                onStatusUpdate={onStatusUpdate}
+              />
+            </div>
+            
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              className="text-xs h-5 w-full hover:bg-gray-100"
+              onClick={() => router.push(`/orders/${item.orderId}`)}
+            >
+              📋 View
+            </Button>
           </div>
         )}
       </div>
@@ -358,7 +473,6 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null)
   
   // New state for improved UX
-  const [compactView, setCompactView] = useState(false)
   const [showOnlyUrgent, setShowOnlyUrgent] = useState(false)
   const [expandedStages, setExpandedStages] = useState<Set<ItemStage>>(new Set(['TO_DO', 'GRAPHICS', 'PRINTING']))
   const [itemsPerStage, setItemsPerStage] = useState<Record<ItemStage, number>>({
@@ -783,15 +897,6 @@ export default function DashboardPage() {
                 {/* View Controls */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">Compact View</span>
-                    <Switch
-                      checked={compactView}
-                      onCheckedChange={setCompactView}
-                    />
-                    {compactView ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">Urgent Only</span>
                     <Switch
                       checked={showOnlyUrgent}
@@ -815,7 +920,7 @@ export default function DashboardPage() {
                   <p>{error}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
                      style={{ gridAutoRows: 'min-content' }}>
                   {stageColumns.map((stage) => {
                     const allStageItems = taskItems.filter((item) => item.currentStage === stage.key)
@@ -827,9 +932,9 @@ export default function DashboardPage() {
                     const hiddenCount = filteredStageItems.length - visibleItems.length
                     
                     return (
-                      <div key={stage.key} className="space-y-4">
+                      <div key={stage.key} className="space-y-3">
                         {/* Stage Header */}
-                        <div className={`p-4 rounded-lg ${stage.color} border border-gray-200`}>
+                        <div className={`p-3 rounded-lg ${stage.color} border border-gray-200`}>
                           <div className="flex items-center justify-between">
                             <div>
                               <h3 className="font-semibold text-sm">{stage.label}</h3>
@@ -840,7 +945,7 @@ export default function DashboardPage() {
                                 }
                               </p>
                               {filteredStageItems.length > 0 && (
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
                                   {getStageInstructions(stage.key)}
                                 </p>
                               )}
@@ -863,197 +968,18 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Stage Items */}
-                        <div className="space-y-3"
+                        <div className="space-y-2"
                              style={{ maxHeight: isExpanded ? 'none' : '60vh', overflowY: isExpanded ? 'visible' : 'auto' }}>
                           {visibleItems.map((item) => (
-                            compactView ? (
-                              <CompactTaskCard
-                                key={`${item.itemId}-${item.assignmentId}`}
-                                item={item}
-                                onStatusUpdate={handleStatusUpdate}
-                                handleSelfAssignment={handleSelfAssignment}
-                                user={user}
-                                isAdmin={isAdmin}
-                                router={router}
-                              />
-                            ) : (
-                              <Card 
-                                key={`${item.itemId}-${item.assignmentId}`} 
-                                className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
-                                  isTaskOverdue(item.dueDate) ? 'border-red-200 bg-red-50' :
-                                  isTaskDueSoon(item.dueDate) ? 'border-yellow-200 bg-yellow-50' : ''
-                                }`}
-                              >
-                                <div className="space-y-3">
-                                  {/* Header with Order Number and Priority */}
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-xs font-mono text-primary font-bold">{item.orderNumber}</span>
-                                    <Badge
-                                      variant="secondary"
-                                      className={`text-xs ${getPriorityColor(item.priority)} text-white`}
-                                    >
-                                      {PRIORITY_LABELS[item.priority as keyof typeof PRIORITY_LABELS]}
-                                    </Badge>
-                                  </div>
-
-                                  {/* Product Information */}
-                                  <div className="space-y-1">
-                                    <p className="font-medium text-sm">{item.productName}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      Qty: <span className="font-medium">{item.quantity}</span> • {item.client}
-                                    </p>
-                                    {item.productType && (
-                                      <p className="text-xs text-muted-foreground">
-                                        Type: <span className="font-medium">{item.productType}</span>
-                                      </p>
-                                    )}
-                                    {(item.productSize || item.productMaterial) && (
-                                      <p className="text-xs text-muted-foreground">
-                                        {item.productSize && `Size: ${item.productSize}`}
-                                        {item.productSize && item.productMaterial && ' • '}
-                                        {item.productMaterial && `Material: ${item.productMaterial}`}
-                                      </p>
-                                    )}
-                                  </div>
-
-                                  {/* Current Stage Instructions */}
-                                  <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                                    <div className="flex items-start gap-2">
-                                      <Target className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
-                                      <div className="space-y-1">
-                                        <p className="text-xs font-medium text-blue-900">What to do:</p>
-                                        <p className="text-xs text-blue-700">{getStageInstructions(item.currentStage)}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Priority Context */}
-                                  <div className="text-xs text-muted-foreground">
-                                    <span className="font-medium">{getPriorityContext(item.priority)}</span>
-                                  </div>
-
-                                  {/* Special Instructions and Notes */}
-                                  {(item.specialInstructions || item.stageNotes || item.orderNotes || item.textToPrint || item.itemDescription) && (
-                                    <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
-                                      <div className="flex items-start gap-2">
-                                        <Info className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
-                                        <div className="space-y-1">
-                                          <p className="text-xs font-medium text-amber-900">Instructions & Notes:</p>
-                                          {item.stageNotes && (
-                                            <p className="text-xs text-amber-700 font-medium bg-amber-100 p-1 rounded">
-                                              <strong>🎯 Assignment Notes:</strong> {item.stageNotes}
-                                            </p>
-                                          )}
-                                          {item.specialInstructions && (
-                                            <p className="text-xs text-amber-700"><strong>Special:</strong> {item.specialInstructions}</p>
-                                          )}
-                                          {item.orderNotes && (
-                                            <p className="text-xs text-amber-700"><strong>Order:</strong> {item.orderNotes}</p>
-                                          )}
-                                          {item.textToPrint && (
-                                            <p className="text-xs text-amber-700"><strong>Text to Print:</strong> {item.textToPrint}</p>
-                                          )}
-                                          {item.itemDescription && (
-                                            <p className="text-xs text-amber-700"><strong>Item:</strong> {item.itemDescription}</p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Product Description */}
-                                  {item.productDescription && (
-                                    <div className="bg-gray-50 p-2 rounded-md border border-gray-100">
-                                      <div className="flex items-start gap-2">
-                                        <FileText className="h-3 w-3 text-gray-600 mt-0.5 flex-shrink-0" />
-                                        <div className="space-y-1">
-                                          <p className="text-xs font-medium text-gray-900">Product Details:</p>
-                                          <p className="text-xs text-gray-700">{item.productDescription}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Due Date */}
-                                  <div className="flex items-center gap-1 text-xs">
-                                    <Calendar className="h-3 w-3" />
-                                    <span className={`${isTaskOverdue(item.dueDate) ? 'text-red-600 font-bold' : isTaskDueSoon(item.dueDate) ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
-                                      Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due date'}
-                                    </span>
-                                    {isTaskOverdue(item.dueDate) && <span className="text-red-600 text-xs">⚠️ OVERDUE</span>}
-                                    {isTaskDueSoon(item.dueDate) && !isTaskOverdue(item.dueDate) && <span className="text-orange-600 text-xs">⏰ DUE SOON</span>}
-                                  </div>
-
-                                  {/* Assignment Status */}
-                                  <div className="flex items-center gap-1 text-xs">
-                                    <User className="h-3 w-3" />
-                                    <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-                                      {item.assignedTo === 'Not assigned to anyone' ? 'Available for pickup' : 
-                                       item.assignedTo === user?._id ? 'Assigned to you' : 
-                                       item.assignedTo}
-                                    </span>
-                                  </div>
-
-                                  {/* Next Step Preview */}
-                                  {item.nextStage && !item.disabledStages?.includes(item.nextStage) && (
-                                    <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded-md border border-green-100">
-                                      <p className="font-medium text-green-900">Next: {item.nextStage.replace('_', ' ')}</p>
-                                      <p className="text-green-700">{getStageInstructions(item.nextStage)}</p>
-                                    </div>
-                                  )}
-
-                                  {/* Disabled Stages Info */}
-                                  {item.disabledStages && item.disabledStages.length > 0 && (
-                                    <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-md border border-gray-100">
-                                      <p className="font-medium text-gray-900">Skipped Stages:</p>
-                                      <p className="text-gray-700">
-                                        {item.disabledStages.map(stage => stage.replace('_', ' ')).join(', ')} 
-                                        - These stages are not needed for this item
-                                      </p>
-                                    </div>
-                                  )}
-
-                                  {/* Action Buttons */}
-                                  <div className="space-y-1 pt-2 border-t border-gray-100">
-                                    {/* Show assignment button for unassigned items */}
-                                    {item.isUnassigned && !isAdmin && (
-                                      <Button 
-                                        size="sm" 
-                                        variant="default" 
-                                        className="text-xs h-7 w-full bg-blue-600 hover:bg-blue-700"
-                                        onClick={async () => {
-                                          try {
-                                            await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
-                                          } catch (error) {
-                                            console.error("Failed to assign task:", error)
-                                          }
-                                        }}
-                                      >
-                                        🎯 Take This Task
-                                      </Button>
-                                    )}
-                                    
-                                    {/* Stage Update Dropdown */}
-                                    <div className="space-y-1">
-                                      <label className="text-xs font-medium text-gray-700">Update Stage:</label>
-                                      <StageUpdateSelect 
-                                        item={item} 
-                                        onStatusUpdate={handleStatusUpdate}
-                                      />
-                                    </div>
-                                    
-                                    <Button 
-                                      size="sm" 
-                                      variant="ghost" 
-                                      className="text-xs h-6 w-full hover:bg-gray-100"
-                                      onClick={() => router.push(`/orders/${item.orderId}`)}
-                                    >
-                                      📋 View Full Order
-                                    </Button>
-                                  </div>
-                                </div>
-                              </Card>
-                            )
+                            <ExpandableTaskCard
+                              key={`${item.itemId}-${item.assignmentId}`}
+                              item={item}
+                              onStatusUpdate={handleStatusUpdate}
+                              handleSelfAssignment={handleSelfAssignment}
+                              user={user}
+                              isAdmin={isAdmin}
+                              router={router}
+                            />
                           ))}
                           
                           {/* Show More/Less Controls */}
