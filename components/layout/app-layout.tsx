@@ -7,6 +7,7 @@ import { useEffect } from "react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "./app-sidebar"
 import { Separator } from "@/components/ui/separator"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -68,6 +69,9 @@ export function AppLayout({ children, breadcrumbs = [] }: AppLayoutProps) {
               </BreadcrumbList>
             </Breadcrumb>
           )}
+          <div className="ml-auto">
+            <ThemeToggle />
+          </div>
         </header>
         <main className="flex-1 overflow-auto p-4">{children}</main>
       </SidebarInset>

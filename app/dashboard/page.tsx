@@ -50,26 +50,26 @@ interface TaskItem {
 }
 
 const stageColumns = [
-  { key: "TO_DO" as ItemStage, label: "To Do", color: "bg-gray-100" },
-  { key: "GRAPHICS" as ItemStage, label: "Graphics", color: "bg-blue-100" },
-  { key: "PRINTING" as ItemStage, label: "Printing", color: "bg-yellow-100" },
-  { key: "CUTTING" as ItemStage, label: "Cutting", color: "bg-orange-100" },
-  { key: "FINISHING" as ItemStage, label: "Finishing", color: "bg-purple-100" },
-  { key: "PACKING" as ItemStage, label: "Packing", color: "bg-green-100" },
+  { key: "TO_DO" as ItemStage, label: "To Do", color: "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700", icon: "📋" },
+  { key: "GRAPHICS" as ItemStage, label: "Graphics", color: "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800", icon: "🎨" },
+  { key: "PRINTING" as ItemStage, label: "Printing", color: "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800", icon: "🖨️" },
+  { key: "CUTTING" as ItemStage, label: "Cutting", color: "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800", icon: "✂️" },
+  { key: "FINISHING" as ItemStage, label: "Finishing", color: "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800", icon: "✨" },
+  { key: "PACKING" as ItemStage, label: "Packing", color: "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800", icon: "📦" },
 ]
 
 function getPriorityColor(priority: string) {
   switch (priority) {
     case "URGENT":
-      return "bg-red-500"
+      return "bg-red-500 dark:bg-red-600"
     case "HIGH":
-      return "bg-orange-500"
+      return "bg-orange-500 dark:bg-orange-600"
     case "NORMAL":
-      return "bg-blue-500"
+      return "bg-blue-500 dark:bg-blue-600"
     case "LOW":
-      return "bg-gray-500"
+      return "bg-slate-500 dark:bg-slate-600"
     default:
-      return "bg-gray-500"
+      return "bg-slate-500 dark:bg-slate-600"
   }
 }
 
@@ -196,10 +196,10 @@ function TaskHighlight({
   type?: 'info' | 'warning' | 'success' | 'instructions'
 }) {
   const styles = {
-    info: 'bg-blue-50 border-blue-100 text-blue-900',
-    warning: 'bg-amber-50 border-amber-100 text-amber-900',
-    success: 'bg-green-50 border-green-100 text-green-900',
-    instructions: 'bg-purple-50 border-purple-100 text-purple-900'
+    info: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-100',
+    warning: 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100',
+    success: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100',
+    instructions: 'bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800 text-violet-900 dark:text-violet-100'
   }
 
   return (
@@ -229,9 +229,12 @@ function ExpandableTaskCard({
 
   return (
     <Card 
-      className={`p-2 hover:shadow-md transition-shadow cursor-pointer ${
-        isTaskOverdue(item.dueDate) ? 'border-red-200 bg-red-50' :
-        isTaskDueSoon(item.dueDate) ? 'border-yellow-200 bg-yellow-50' : ''
+      className={`p-3 hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 bg-card/50 backdrop-blur-sm ${
+        isTaskOverdue(item.dueDate) ? 
+          'border-l-red-500 dark:border-l-red-400 bg-red-50/50 dark:bg-red-950/20 border-red-200 dark:border-red-900' :
+        isTaskDueSoon(item.dueDate) ? 
+          'border-l-amber-500 dark:border-l-amber-400 bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900' : 
+          'border-l-blue-500 dark:border-l-blue-400 hover:border-l-blue-600 dark:hover:border-l-blue-300'
       }`}
     >
       <div className="space-y-2">
@@ -291,12 +294,12 @@ function ExpandableTaskCard({
             </div>
 
             {/* Current Stage Instructions */}
-            <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
+            <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-start gap-2">
-                <Target className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                <Target className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-blue-900">What to do:</p>
-                  <p className="text-xs text-blue-700">{getStageInstructions(item.currentStage)}</p>
+                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100">What to do:</p>
+                  <p className="text-xs text-blue-700 dark:text-blue-200">{getStageInstructions(item.currentStage)}</p>
                 </div>
               </div>
             </div>
@@ -308,27 +311,27 @@ function ExpandableTaskCard({
 
             {/* Special Instructions and Notes */}
             {(item.specialInstructions || item.stageNotes || item.orderNotes || item.textToPrint || item.itemDescription) && (
-              <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
+              <div className="bg-amber-50 dark:bg-amber-950/30 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
                 <div className="flex items-start gap-2">
-                  <Info className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-amber-900">Instructions & Notes:</p>
+                    <p className="text-xs font-medium text-amber-900 dark:text-amber-100">Instructions & Notes:</p>
                     {item.stageNotes && (
-                      <p className="text-xs text-amber-700 font-medium bg-amber-100 p-1 rounded">
+                      <p className="text-xs text-amber-700 dark:text-amber-200 font-medium bg-amber-100 dark:bg-amber-900/40 p-2 rounded">
                         <strong>🎯 Assignment Notes:</strong> {item.stageNotes}
                       </p>
                     )}
                     {item.specialInstructions && (
-                      <p className="text-xs text-amber-700"><strong>Special:</strong> {item.specialInstructions}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-200"><strong>Special:</strong> {item.specialInstructions}</p>
                     )}
                     {item.orderNotes && (
-                      <p className="text-xs text-amber-700"><strong>Order:</strong> {item.orderNotes}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-200"><strong>Order:</strong> {item.orderNotes}</p>
                     )}
                     {item.textToPrint && (
-                      <p className="text-xs text-amber-700"><strong>Text to Print:</strong> {item.textToPrint}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-200"><strong>Text to Print:</strong> {item.textToPrint}</p>
                     )}
                     {item.itemDescription && (
-                      <p className="text-xs text-amber-700"><strong>Item:</strong> {item.itemDescription}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-200"><strong>Item:</strong> {item.itemDescription}</p>
                     )}
                   </div>
                 </div>
@@ -337,12 +340,12 @@ function ExpandableTaskCard({
 
             {/* Product Description */}
             {item.productDescription && (
-              <div className="bg-gray-50 p-2 rounded-md border border-gray-100">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                 <div className="flex items-start gap-2">
-                  <FileText className="h-3 w-3 text-gray-600 mt-0.5 flex-shrink-0" />
+                  <FileText className="h-4 w-4 text-slate-600 dark:text-slate-400 mt-0.5 flex-shrink-0" />
                   <div className="space-y-1">
-                    <p className="text-xs font-medium text-gray-900">Product Details:</p>
-                    <p className="text-xs text-gray-700">{item.productDescription}</p>
+                    <p className="text-xs font-medium text-slate-900 dark:text-slate-100">Product Details:</p>
+                    <p className="text-xs text-slate-700 dark:text-slate-300">{item.productDescription}</p>
                   </div>
                 </div>
               </div>
@@ -370,17 +373,17 @@ function ExpandableTaskCard({
 
             {/* Next Step Preview */}
             {item.nextStage && !item.disabledStages?.includes(item.nextStage) && (
-              <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded-md border border-green-100">
-                <p className="font-medium text-green-900">Next: {item.nextStage.replace('_', ' ')}</p>
-                <p className="text-green-700">{getStageInstructions(item.nextStage)}</p>
+              <div className="text-xs text-muted-foreground bg-emerald-50 dark:bg-emerald-950/30 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <p className="font-medium text-emerald-900 dark:text-emerald-100">Next: {item.nextStage.replace('_', ' ')}</p>
+                <p className="text-emerald-700 dark:text-emerald-200">{getStageInstructions(item.nextStage)}</p>
               </div>
             )}
 
             {/* Disabled Stages Info */}
             {item.disabledStages && item.disabledStages.length > 0 && (
-              <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-md border border-gray-100">
-                <p className="font-medium text-gray-900">Skipped Stages:</p>
-                <p className="text-gray-700">
+              <div className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                <p className="font-medium text-slate-900 dark:text-slate-100">Skipped Stages:</p>
+                <p className="text-slate-700 dark:text-slate-300">
                   {item.disabledStages.map(stage => stage.replace('_', ' ')).join(', ')} 
                   - These stages are not needed for this item
                 </p>
@@ -388,13 +391,13 @@ function ExpandableTaskCard({
             )}
 
             {/* Action Buttons */}
-            <div className="space-y-1 pt-2 border-t border-gray-100">
+            <div className="space-y-2 pt-3 border-t border-border">
               {/* Show assignment button for unassigned items */}
               {item.isUnassigned && !isAdmin && (
                 <Button 
                   size="sm" 
                   variant="default" 
-                  className="text-xs h-7 w-full bg-blue-600 hover:bg-blue-700"
+                  className="text-xs h-8 w-full bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
                   onClick={async () => {
                     try {
                       await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
@@ -929,7 +932,7 @@ export default function DashboardPage() {
                   <p>{error}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4"
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6"
                      style={{ gridAutoRows: 'min-content' }}>
                   {stageColumns.map((stage) => {
                     const allStageItems = taskItems.filter((item) => item.currentStage === stage.key)
@@ -941,23 +944,26 @@ export default function DashboardPage() {
                     const hiddenCount = filteredStageItems.length - visibleItems.length
                     
                     return (
-                      <div key={stage.key} className="space-y-3">
+                      <div key={stage.key} className="space-y-4">
                         {/* Stage Header */}
-                        <div className={`p-3 rounded-lg ${stage.color} border border-gray-200`}>
+                        <div className={`p-4 rounded-xl border-2 shadow-sm ${stage.color} hover:shadow-md transition-all duration-200`}>
                           <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold text-sm">{stage.label}</h3>
-                              <p className="text-xs text-muted-foreground">
-                                {showOnlyUrgent ? `${filteredStageItems.length} urgent` : `${allStageItems.length} total`}
-                                {showOnlyUrgent && allStageItems.length !== filteredStageItems.length && 
-                                  ` (${allStageItems.length - filteredStageItems.length} hidden)`
-                                }
-                              </p>
-                              {filteredStageItems.length > 0 && (
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                                  {getStageInstructions(stage.key)}
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{stage.icon}</span>
+                              <div>
+                                <h3 className="font-semibold text-sm text-foreground">{stage.label}</h3>
+                                <p className="text-xs text-muted-foreground">
+                                  {showOnlyUrgent ? `${filteredStageItems.length} urgent` : `${allStageItems.length} total`}
+                                  {showOnlyUrgent && allStageItems.length !== filteredStageItems.length && 
+                                    ` (${allStageItems.length - filteredStageItems.length} hidden)`
+                                  }
                                 </p>
-                              )}
+                                {filteredStageItems.length > 0 && (
+                                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2 opacity-75">
+                                    {getStageInstructions(stage.key)}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             
                             {/* Stage Controls */}
@@ -977,7 +983,7 @@ export default function DashboardPage() {
                         </div>
 
                         {/* Stage Items */}
-                        <div className="space-y-2"
+                        <div className="space-y-3"
                              style={{ maxHeight: isExpanded ? 'none' : '60vh', overflowY: isExpanded ? 'visible' : 'auto' }}>
                           {visibleItems.map((item) => (
                             <ExpandableTaskCard

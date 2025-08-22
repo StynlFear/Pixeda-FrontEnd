@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/sidebar"
 import { LayoutDashboard, Users, UserCheck, Package, ShoppingCart, Settings, LogOut, BriefcaseBusiness, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ThemeToggle } from "@/components/ui/theme-toggle"
 import Link from "next/link"
 
 const menuItems = [
@@ -114,6 +115,10 @@ export function AppSidebar() {
             <p className="text-sm font-medium">{user?.firstName} {user?.lastName}</p>
             <p className="text-xs text-muted-foreground">{user?.email}</p>
             <p className="text-xs text-accent font-medium">{user?.position}</p>
+          </div>
+          <div className="flex items-center gap-2 mb-3">
+            <ThemeToggle />
+            <span className="text-xs text-muted-foreground">Theme</span>
           </div>
           <Button variant="outline" size="sm" className="w-full bg-transparent" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-2" />
