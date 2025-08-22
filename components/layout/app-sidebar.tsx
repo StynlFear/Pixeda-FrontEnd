@@ -75,8 +75,8 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader className="border-b border-border">
-        <div className="flex items-center gap-2 px-4 py-2">
+      <SidebarHeader className="border-b p-0">
+        <div className="flex h-16 items-center gap-2 px-4">
           <div className="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
             <span className="text-sm font-bold text-primary-foreground">PX</span>
           </div>
