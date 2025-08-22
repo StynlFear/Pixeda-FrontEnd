@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import React from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { AppLayout } from "@/components/layout/app-layout"
 import { ProtectedRoute } from "@/components/protected-route"
@@ -8,7 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Clock, AlertTriangle, CheckCircle, Package, Calendar, User, Loader2 } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
+import { Clock, AlertTriangle, CheckCircle, Package, Calendar, User, Loader2, FileText, Info, Target, ChevronDown, ChevronUp, Eye, EyeOff, Grid, List } from "lucide-react"
 import { PRIORITY_LABELS } from "@/lib/constants"
 import api from "@/lib/axios"
 
@@ -30,6 +33,20 @@ interface TaskItem {
   priority: Priority
   assignedTo: string
   isUnassigned: boolean
+  // Enhanced fields for better task visibility
+  productDescription?: string
+  specialInstructions?: string
+  stageNotes?: string
+  productType?: string
+  productSize?: string
+  productMaterial?: string
+  orderNotes?: string
+  clientNotes?: string
+  nextStage?: ItemStage | null
+  // Additional item-specific information
+  textToPrint?: string
+  disabledStages?: ItemStage[]
+  itemDescription?: string
 }
 
 const stageColumns = [
@@ -68,6 +85,58 @@ function isTaskDueSoon(dueDate: string): boolean {
   return diffDays <= 2 && diffDays >= 0
 }
 
+// Helper function to get stage-specific instructions
+function getStageInstructions(stage: ItemStage): string {
+  switch (stage) {
+    case "TO_DO":
+      return "Ready to be assigned and started"
+    case "GRAPHICS":
+      return "Create/review graphics design, prepare files for production"
+    case "PRINTING":
+      return "Print materials according to specifications"
+    case "CUTTING":
+      return "Cut printed materials to required dimensions"
+    case "FINISHING":
+      return "Apply finishing touches (lamination, binding, etc.)"
+    case "PACKING":
+      return "Package items for delivery/pickup"
+    case "DONE":
+      return "Task completed"
+    case "STANDBY":
+      return "On hold - awaiting further instructions"
+    case "CANCELLED":
+      return "Task cancelled"
+    default:
+      return "Follow standard procedures for this stage"
+  }
+}
+
+// Helper function to get next stage
+function getNextStage(currentStage: ItemStage): ItemStage | null {
+  const stageOrder: ItemStage[] = ["TO_DO", "GRAPHICS", "PRINTING", "CUTTING", "FINISHING", "PACKING", "DONE"]
+  const currentIndex = stageOrder.indexOf(currentStage)
+  if (currentIndex >= 0 && currentIndex < stageOrder.length - 1) {
+    return stageOrder[currentIndex + 1]
+  }
+  return null
+}
+
+// Helper function to get priority context
+function getPriorityContext(priority: Priority): string {
+  switch (priority) {
+    case "URGENT":
+      return "⚡ Drop everything - complete ASAP"
+    case "HIGH":
+      return "🔥 High priority - complete today if possible"
+    case "NORMAL":
+      return "📋 Standard priority"
+    case "LOW":
+      return "⏳ Low priority - complete when time allows"
+    default:
+      return "📋 Standard priority"
+  }
+}
+
 // Component for updating item stage
 function StageUpdateSelect({ 
   item, 
@@ -91,7 +160,7 @@ function StageUpdateSelect({
 
   return (
     <Select value={item.currentStage} onValueChange={handleStageChange} disabled={updating}>
-      <SelectTrigger className="w-full text-xs h-6">
+      <SelectTrigger className="w-full text-xs h-7">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -109,14 +178,240 @@ function StageUpdateSelect({
   )
 }
 
+// Component for highlighting important information
+function TaskHighlight({ 
+  children, 
+  type = 'info' 
+}: { 
+  children: React.ReactNode
+  type?: 'info' | 'warning' | 'success' | 'instructions'
+}) {
+  const styles = {
+    info: 'bg-blue-50 border-blue-100 text-blue-900',
+    warning: 'bg-amber-50 border-amber-100 text-amber-900',
+    success: 'bg-green-50 border-green-100 text-green-900',
+    instructions: 'bg-purple-50 border-purple-100 text-purple-900'
+  }
+
+  return (
+    <div className={`p-2 rounded-md border ${styles[type]}`}>
+      {children}
+    </div>
+  )
+}
+
+// Compact Task Card Component
+function CompactTaskCard({ 
+  item, 
+  onStatusUpdate, 
+  handleSelfAssignment, 
+  user, 
+  isAdmin,
+  router
+}: {
+  item: TaskItem
+  onStatusUpdate: (itemId: string, assignmentId: string, newStage: ItemStage) => Promise<void>
+  handleSelfAssignment: (itemId: string, orderId: string, stage: ItemStage) => Promise<void>
+  user: any
+  isAdmin: boolean
+  router: any
+}) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <Card 
+      className={`p-2 hover:shadow-md transition-shadow cursor-pointer ${
+        isTaskOverdue(item.dueDate) ? 'border-red-200 bg-red-50' :
+        isTaskDueSoon(item.dueDate) ? 'border-yellow-200 bg-yellow-50' : ''
+      }`}
+    >
+      <div className="space-y-2">
+        {/* Compact Header - Always Visible */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-xs font-mono text-primary font-bold truncate">{item.orderNumber}</span>
+            <Badge
+              variant="secondary"
+              className={`text-xs ${getPriorityColor(item.priority)} text-white flex-shrink-0`}
+            >
+              {item.priority === 'URGENT' ? '🚨' : item.priority === 'HIGH' ? '🔥' : '📋'}
+            </Badge>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 flex-shrink-0"
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </Button>
+        </div>
+
+        {/* Product Info - Always Visible */}
+        <div>
+          <p className="font-medium text-sm truncate">{item.productName}</p>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Qty: {item.quantity} • {item.client}</span>
+            <span className={`${isTaskOverdue(item.dueDate) ? 'text-red-600 font-bold' : isTaskDueSoon(item.dueDate) ? 'text-orange-600 font-medium' : ''}`}>
+              {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due'}
+            </span>
+          </div>
+        </div>
+
+        {/* Assignment Status - Always Visible */}
+        <div className="flex items-center justify-between text-xs">
+          <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+            {item.assignedTo === 'Not assigned to anyone' ? '🔄 Available' : '👤 Assigned to you'}
+          </span>
+          {item.isUnassigned && !isAdmin && (
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-xs h-5 px-2"
+              onClick={async () => {
+                try {
+                  await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
+                } catch (error) {
+                  console.error("Failed to assign task:", error)
+                }
+              }}
+            >
+              Take
+            </Button>
+          )}
+        </div>
+
+        {/* Expanded Details */}
+        {expanded && (
+          <div className="space-y-2 pt-2 border-t border-gray-100">
+            {/* Current Stage Instructions */}
+            <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
+              <div className="flex items-start gap-2">
+                <Target className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-blue-900">What to do:</p>
+                  <p className="text-xs text-blue-700">{getStageInstructions(item.currentStage)}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Special Instructions */}
+            {(item.specialInstructions || item.stageNotes || item.orderNotes || item.textToPrint || item.itemDescription) && (
+              <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
+                <div className="flex items-start gap-2">
+                  <Info className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-amber-900">Notes & Instructions:</p>
+                    {item.stageNotes && (
+                      <p className="text-xs text-amber-700 font-medium bg-amber-100 p-1 rounded">
+                        <strong>🎯 Assignment Notes:</strong> {item.stageNotes}
+                      </p>
+                    )}
+                    {item.specialInstructions && (
+                      <p className="text-xs text-amber-700"><strong>Special:</strong> {item.specialInstructions}</p>
+                    )}
+                    {item.orderNotes && (
+                      <p className="text-xs text-amber-700"><strong>Order:</strong> {item.orderNotes}</p>
+                    )}
+                    {item.textToPrint && (
+                      <p className="text-xs text-amber-700"><strong>Text to Print:</strong> {item.textToPrint}</p>
+                    )}
+                    {item.itemDescription && (
+                      <p className="text-xs text-amber-700"><strong>Item:</strong> {item.itemDescription}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="space-y-1">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-700">Update Stage:</label>
+                <StageUpdateSelect 
+                  item={item} 
+                  onStatusUpdate={onStatusUpdate}
+                />
+              </div>
+              <Button 
+                size="sm" 
+                variant="ghost" 
+                className="text-xs h-6 w-full hover:bg-gray-100"
+                onClick={() => router.push(`/orders/${item.orderId}`)}
+              >
+                📋 View Full Order
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 export default function DashboardPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const isAdmin = user?.position === "admin"
   const [taskItems, setTaskItems] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // New state for improved UX
+  const [compactView, setCompactView] = useState(false)
+  const [showOnlyUrgent, setShowOnlyUrgent] = useState(false)
+  const [expandedStages, setExpandedStages] = useState<Set<ItemStage>>(new Set(['TO_DO', 'GRAPHICS', 'PRINTING']))
+  const [itemsPerStage, setItemsPerStage] = useState<Record<ItemStage, number>>({
+    TO_DO: 5,
+    GRAPHICS: 5,
+    PRINTING: 5,
+    CUTTING: 5,
+    FINISHING: 5,
+    PACKING: 5,
+    DONE: 3,
+    STANDBY: 3,
+    CANCELLED: 2
+  })
 
   const breadcrumbs = [{ label: "Dashboard" }]
+
+  // Helper functions for stage management
+  const toggleStageExpansion = (stage: ItemStage) => {
+    const newExpanded = new Set(expandedStages)
+    if (newExpanded.has(stage)) {
+      newExpanded.delete(stage)
+    } else {
+      newExpanded.add(stage)
+    }
+    setExpandedStages(newExpanded)
+  }
+
+  const showMoreItems = (stage: ItemStage) => {
+    setItemsPerStage(prev => ({
+      ...prev,
+      [stage]: prev[stage] + 5
+    }))
+  }
+
+  const showLessItems = (stage: ItemStage) => {
+    setItemsPerStage(prev => ({
+      ...prev,
+      [stage]: Math.max(3, prev[stage] - 5)
+    }))
+  }
+
+  // Filter items based on current settings
+  const getFilteredItems = (stageItems: TaskItem[]) => {
+    if (showOnlyUrgent) {
+      return stageItems.filter(item => 
+        item.priority === 'URGENT' || 
+        item.priority === 'HIGH' || 
+        isTaskOverdue(item.dueDate) ||
+        isTaskDueSoon(item.dueDate)
+      )
+    }
+    return stageItems
+  }
 
   // Fetch orders and transform them into task items
   useEffect(() => {
@@ -168,39 +463,58 @@ export default function DashboardPage() {
             // Get the current stage of the item
             const currentStage = item.itemStatus || 'TO_DO'
             
+            // Extract additional product information
+            const productInfo = item.product || {}
+            const baseTaskData = {
+              orderId: order._id,
+              itemId: item._id,
+              orderNumber: order.orderNumber || `Order ${order._id}`,
+              productName: item.productNameSnapshot || productInfo.name || 'Unknown Product',
+              quantity: item.quantity || 1,
+              client: clientName,
+              dueDate: order.dueDate || '',
+              currentStage: currentStage,
+              priority: order.priority || 'NORMAL',
+              // Enhanced information
+              productDescription: productInfo.description || item.descriptionSnapshot || '',
+              specialInstructions: item.specialInstructions || order.specialInstructions || '',
+              orderNotes: order.description || order.notes || '',
+              clientNotes: order.customerNotes || '',
+              productType: productInfo.type || productInfo.category || '',
+              productSize: productInfo.size || item.size || '',
+              productMaterial: productInfo.material || item.material || '',
+              nextStage: getNextStage(currentStage),
+              // Additional item-specific information
+              textToPrint: item.textToPrint || '',
+              disabledStages: item.disabledStages || [],
+              itemDescription: item.descriptionSnapshot || ''
+            }
+            
             if (isAdmin) {
               // Admin sees all items, regardless of assignments
+              // For admin, we'll show all assignment info for the current stage
+              const currentAssignment = item.assignments?.find((assignment: any) => assignment.stage === currentStage)
+              const assignedPersonName = currentAssignment?.assignedTo ? 
+                `${currentAssignment.assignedTo.firstName || ''} ${currentAssignment.assignedTo.lastName || ''}`.trim() || 
+                'Assigned' : 'Not assigned'
+              
               tasks.push({
-                orderId: order._id,
-                itemId: item._id,
-                assignmentId: item._id, // Use item ID as fallback for admin view
-                orderNumber: order.orderNumber || `Order ${order._id}`,
-                productName: item.productNameSnapshot || 'Unknown Product',
-                quantity: item.quantity || 1,
-                client: clientName,
-                dueDate: order.dueDate || '',
-                currentStage: currentStage,
-                priority: order.priority || 'NORMAL',
-                assignedTo: 'All Users', // Admin view shows all
-                isUnassigned: false
+                ...baseTaskData,
+                assignmentId: currentAssignment?._id || item._id, // Use assignment ID if available
+                assignedTo: assignedPersonName,
+                isUnassigned: !currentAssignment,
+                stageNotes: currentAssignment?.stageNotes || currentAssignment?.notes || ''
               })
             } else {
               // For non-admin users, check assignments
               if (!item.assignments || !Array.isArray(item.assignments)) {
                 // If no assignments exist, show item as unassigned and available for pickup
                 tasks.push({
-                  orderId: order._id,
-                  itemId: item._id,
+                  ...baseTaskData,
                   assignmentId: item._id, // Use item ID as fallback
-                  orderNumber: order.orderNumber || `Order ${order._id}`,
-                  productName: item.productNameSnapshot || 'Unknown Product',
-                  quantity: item.quantity || 1,
-                  client: clientName,
-                  dueDate: order.dueDate || '',
-                  currentStage: currentStage,
-                  priority: order.priority || 'NORMAL',
                   assignedTo: 'Not assigned to anyone',
-                  isUnassigned: true
+                  isUnassigned: true,
+                  stageNotes: '' // No assignment = no assignment notes
                 })
                 continue
               }
@@ -211,18 +525,11 @@ export default function DashboardPage() {
               // If no assignment for current stage, show as unassigned and available
               if (!currentAssignment) {
                 tasks.push({
-                  orderId: order._id,
-                  itemId: item._id,
+                  ...baseTaskData,
                   assignmentId: item._id, // Use item ID as fallback
-                  orderNumber: order.orderNumber || `Order ${order._id}`,
-                  productName: item.productNameSnapshot || 'Unknown Product',
-                  quantity: item.quantity || 1,
-                  client: clientName,
-                  dueDate: order.dueDate || '',
-                  currentStage: currentStage,
-                  priority: order.priority || 'NORMAL',
                   assignedTo: 'Not assigned to anyone',
-                  isUnassigned: true
+                  isUnassigned: true,
+                  stageNotes: '' // No assignment for this stage = no assignment notes
                 })
                 continue
               }
@@ -235,19 +542,22 @@ export default function DashboardPage() {
               // Only show items that are assigned to the current user
               if (assignedToId !== user?._id) continue
 
+              // Debug log for assignment notes
+              if (currentAssignment.stageNotes) {
+                console.log('Assignment notes found:', {
+                  orderId: order._id,
+                  itemId: item._id,
+                  stage: currentStage,
+                  stageNotes: currentAssignment.stageNotes
+                })
+              }
+
               tasks.push({
-                orderId: order._id,
-                itemId: item._id,
+                ...baseTaskData,
                 assignmentId: currentAssignment._id,
-                orderNumber: order.orderNumber || `Order ${order._id}`,
-                productName: item.productNameSnapshot || 'Unknown Product',
-                quantity: item.quantity || 1,
-                client: clientName,
-                dueDate: order.dueDate || '',
-                currentStage: currentStage,
-                priority: order.priority || 'NORMAL',
                 assignedTo: assignedToId,
-                isUnassigned: false
+                isUnassigned: false,
+                stageNotes: currentAssignment.stageNotes || currentAssignment.notes || ''
               })
             }
           }
@@ -446,12 +756,12 @@ export default function DashboardPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+                <CardTitle className="text-sm font-medium">My Active Tasks</CardTitle>
                 <CheckCircle className="h-4 w-4 text-accent" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-accent">{activeItems.length}</div>
-                <p className="text-xs text-muted-foreground">{isAdmin ? 'Active assignments' : 'Your assignments + unassigned items'}</p>
+                <p className="text-xs text-muted-foreground">{isAdmin ? 'All active items' : 'Your assignments + available tasks'}</p>
               </CardContent>
             </Card>
           </div>
@@ -464,18 +774,40 @@ export default function DashboardPage() {
                   <CardTitle>{isAdmin ? 'All Task Items' : 'My Task Board'}</CardTitle>
                   <CardDescription>
                     {isAdmin 
-                      ? 'All items in the system organized by workflow stage' 
-                      : 'Items assigned to you and unassigned items organized by workflow stage'
+                      ? 'All items in the system with detailed instructions and requirements' 
+                      : 'Your assigned tasks and available items with clear instructions for each stage. Everything you need to know without opening individual orders.'
                     }
                   </CardDescription>
+                </div>
+                
+                {/* View Controls */}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Compact View</span>
+                    <Switch
+                      checked={compactView}
+                      onCheckedChange={setCompactView}
+                    />
+                    {compactView ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Urgent Only</span>
+                    <Switch
+                      checked={showOnlyUrgent}
+                      onCheckedChange={setShowOnlyUrgent}
+                    />
+                    {showOnlyUrgent ? <Eye className="h-4 w-4 text-orange-500" /> : <EyeOff className="h-4 w-4" />}
+                  </div>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span>Loading your tasks...</span>
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mb-3 text-blue-600" />
+                  <span className="text-sm font-medium">Loading your task board...</span>
+                  <span className="text-xs text-muted-foreground mt-1">Gathering all the details you need</span>
                 </div>
               ) : error ? (
                 <div className="text-center py-8 text-destructive">
@@ -483,96 +815,284 @@ export default function DashboardPage() {
                   <p>{error}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                     style={{ gridAutoRows: 'min-content' }}>
                   {stageColumns.map((stage) => {
-                    const stageItems = taskItems.filter((item) => item.currentStage === stage.key)
+                    const allStageItems = taskItems.filter((item) => item.currentStage === stage.key)
+                    const filteredStageItems = getFilteredItems(allStageItems)
+                    const isExpanded = expandedStages.has(stage.key)
+                    const maxItems = itemsPerStage[stage.key]
+                    const visibleItems = isExpanded ? filteredStageItems.slice(0, maxItems) : filteredStageItems.slice(0, 3)
+                    const hasMore = filteredStageItems.length > visibleItems.length
+                    const hiddenCount = filteredStageItems.length - visibleItems.length
                     
                     return (
-                      <div key={stage.key} className="space-y-3">
-                        <div className={`p-3 rounded-lg ${stage.color}`}>
-                          <h3 className="font-medium text-sm">{stage.label}</h3>
-                          <p className="text-xs text-muted-foreground">
-                            {stageItems.length} items
-                          </p>
+                      <div key={stage.key} className="space-y-4">
+                        {/* Stage Header */}
+                        <div className={`p-4 rounded-lg ${stage.color} border border-gray-200`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-semibold text-sm">{stage.label}</h3>
+                              <p className="text-xs text-muted-foreground">
+                                {showOnlyUrgent ? `${filteredStageItems.length} urgent` : `${allStageItems.length} total`}
+                                {showOnlyUrgent && allStageItems.length !== filteredStageItems.length && 
+                                  ` (${allStageItems.length - filteredStageItems.length} hidden)`
+                                }
+                              </p>
+                              {filteredStageItems.length > 0 && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {getStageInstructions(stage.key)}
+                                </p>
+                              )}
+                            </div>
+                            
+                            {/* Stage Controls */}
+                            <div className="flex items-center gap-1">
+                              {filteredStageItems.length > 3 && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0"
+                                  onClick={() => toggleStageExpansion(stage.key)}
+                                >
+                                  {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="space-y-2">
-                          {stageItems.map((item) => (
-                            <Card 
-                              key={`${item.itemId}-${item.assignmentId}`} 
-                              className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
-                                isTaskOverdue(item.dueDate) ? 'border-red-200 bg-red-50' :
-                                isTaskDueSoon(item.dueDate) ? 'border-yellow-200 bg-yellow-50' : ''
-                              }`}
-                            >
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs font-mono text-primary">{item.orderNumber}</span>
-                                  <Badge
-                                    variant="secondary"
-                                    className={`text-xs ${getPriorityColor(item.priority)} text-white`}
-                                  >
-                                    {PRIORITY_LABELS[item.priority as keyof typeof PRIORITY_LABELS]}
-                                  </Badge>
-                                </div>
+                        {/* Stage Items */}
+                        <div className="space-y-3"
+                             style={{ maxHeight: isExpanded ? 'none' : '60vh', overflowY: isExpanded ? 'visible' : 'auto' }}>
+                          {visibleItems.map((item) => (
+                            compactView ? (
+                              <CompactTaskCard
+                                key={`${item.itemId}-${item.assignmentId}`}
+                                item={item}
+                                onStatusUpdate={handleStatusUpdate}
+                                handleSelfAssignment={handleSelfAssignment}
+                                user={user}
+                                isAdmin={isAdmin}
+                                router={router}
+                              />
+                            ) : (
+                              <Card 
+                                key={`${item.itemId}-${item.assignmentId}`} 
+                                className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
+                                  isTaskOverdue(item.dueDate) ? 'border-red-200 bg-red-50' :
+                                  isTaskDueSoon(item.dueDate) ? 'border-yellow-200 bg-yellow-50' : ''
+                                }`}
+                              >
+                                <div className="space-y-3">
+                                  {/* Header with Order Number and Priority */}
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-mono text-primary font-bold">{item.orderNumber}</span>
+                                    <Badge
+                                      variant="secondary"
+                                      className={`text-xs ${getPriorityColor(item.priority)} text-white`}
+                                    >
+                                      {PRIORITY_LABELS[item.priority as keyof typeof PRIORITY_LABELS]}
+                                    </Badge>
+                                  </div>
 
-                                <div>
-                                  <p className="font-medium text-sm">{item.productName}</p>
-                                  <p className="text-xs text-muted-foreground">Qty: {item.quantity} • {item.client}</p>
-                                </div>
+                                  {/* Product Information */}
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-sm">{item.productName}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Qty: <span className="font-medium">{item.quantity}</span> • {item.client}
+                                    </p>
+                                    {item.productType && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Type: <span className="font-medium">{item.productType}</span>
+                                      </p>
+                                    )}
+                                    {(item.productSize || item.productMaterial) && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {item.productSize && `Size: ${item.productSize}`}
+                                        {item.productSize && item.productMaterial && ' • '}
+                                        {item.productMaterial && `Material: ${item.productMaterial}`}
+                                      </p>
+                                    )}
+                                  </div>
 
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <Calendar className="h-3 w-3" />
-                                  <span className={isTaskOverdue(item.dueDate) ? 'text-red-600 font-medium' : ''}>
-                                    {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due date'}
-                                  </span>
-                                </div>
+                                  {/* Current Stage Instructions */}
+                                  <div className="bg-blue-50 p-2 rounded-md border border-blue-100">
+                                    <div className="flex items-start gap-2">
+                                      <Target className="h-3 w-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-medium text-blue-900">What to do:</p>
+                                        <p className="text-xs text-blue-700">{getStageInstructions(item.currentStage)}</p>
+                                      </div>
+                                    </div>
+                                  </div>
 
-                                {/* Assignment Status */}
-                                <div className="flex items-center gap-1 text-xs">
-                                  <User className="h-3 w-3" />
-                                  <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
-                                    {item.assignedTo === 'Not assigned to anyone' ? 'Not assigned to anyone' : 
-                                     item.assignedTo === user?._id ? 'Assigned to you' : 
-                                     item.assignedTo}
-                                  </span>
-                                </div>
+                                  {/* Priority Context */}
+                                  <div className="text-xs text-muted-foreground">
+                                    <span className="font-medium">{getPriorityContext(item.priority)}</span>
+                                  </div>
 
-                                <div className="space-y-1 pt-2">
-                                  {/* Show assignment button for unassigned items */}
-                                  {item.isUnassigned && !isAdmin && (
+                                  {/* Special Instructions and Notes */}
+                                  {(item.specialInstructions || item.stageNotes || item.orderNotes || item.textToPrint || item.itemDescription) && (
+                                    <div className="bg-amber-50 p-2 rounded-md border border-amber-100">
+                                      <div className="flex items-start gap-2">
+                                        <Info className="h-3 w-3 text-amber-600 mt-0.5 flex-shrink-0" />
+                                        <div className="space-y-1">
+                                          <p className="text-xs font-medium text-amber-900">Instructions & Notes:</p>
+                                          {item.stageNotes && (
+                                            <p className="text-xs text-amber-700 font-medium bg-amber-100 p-1 rounded">
+                                              <strong>🎯 Assignment Notes:</strong> {item.stageNotes}
+                                            </p>
+                                          )}
+                                          {item.specialInstructions && (
+                                            <p className="text-xs text-amber-700"><strong>Special:</strong> {item.specialInstructions}</p>
+                                          )}
+                                          {item.orderNotes && (
+                                            <p className="text-xs text-amber-700"><strong>Order:</strong> {item.orderNotes}</p>
+                                          )}
+                                          {item.textToPrint && (
+                                            <p className="text-xs text-amber-700"><strong>Text to Print:</strong> {item.textToPrint}</p>
+                                          )}
+                                          {item.itemDescription && (
+                                            <p className="text-xs text-amber-700"><strong>Item:</strong> {item.itemDescription}</p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Product Description */}
+                                  {item.productDescription && (
+                                    <div className="bg-gray-50 p-2 rounded-md border border-gray-100">
+                                      <div className="flex items-start gap-2">
+                                        <FileText className="h-3 w-3 text-gray-600 mt-0.5 flex-shrink-0" />
+                                        <div className="space-y-1">
+                                          <p className="text-xs font-medium text-gray-900">Product Details:</p>
+                                          <p className="text-xs text-gray-700">{item.productDescription}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Due Date */}
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <Calendar className="h-3 w-3" />
+                                    <span className={`${isTaskOverdue(item.dueDate) ? 'text-red-600 font-bold' : isTaskDueSoon(item.dueDate) ? 'text-orange-600 font-medium' : 'text-muted-foreground'}`}>
+                                      Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString() : 'No due date'}
+                                    </span>
+                                    {isTaskOverdue(item.dueDate) && <span className="text-red-600 text-xs">⚠️ OVERDUE</span>}
+                                    {isTaskDueSoon(item.dueDate) && !isTaskOverdue(item.dueDate) && <span className="text-orange-600 text-xs">⏰ DUE SOON</span>}
+                                  </div>
+
+                                  {/* Assignment Status */}
+                                  <div className="flex items-center gap-1 text-xs">
+                                    <User className="h-3 w-3" />
+                                    <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                                      {item.assignedTo === 'Not assigned to anyone' ? 'Available for pickup' : 
+                                       item.assignedTo === user?._id ? 'Assigned to you' : 
+                                       item.assignedTo}
+                                    </span>
+                                  </div>
+
+                                  {/* Next Step Preview */}
+                                  {item.nextStage && !item.disabledStages?.includes(item.nextStage) && (
+                                    <div className="text-xs text-muted-foreground bg-green-50 p-2 rounded-md border border-green-100">
+                                      <p className="font-medium text-green-900">Next: {item.nextStage.replace('_', ' ')}</p>
+                                      <p className="text-green-700">{getStageInstructions(item.nextStage)}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Disabled Stages Info */}
+                                  {item.disabledStages && item.disabledStages.length > 0 && (
+                                    <div className="text-xs text-muted-foreground bg-gray-50 p-2 rounded-md border border-gray-100">
+                                      <p className="font-medium text-gray-900">Skipped Stages:</p>
+                                      <p className="text-gray-700">
+                                        {item.disabledStages.map(stage => stage.replace('_', ' ')).join(', ')} 
+                                        - These stages are not needed for this item
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Action Buttons */}
+                                  <div className="space-y-1 pt-2 border-t border-gray-100">
+                                    {/* Show assignment button for unassigned items */}
+                                    {item.isUnassigned && !isAdmin && (
+                                      <Button 
+                                        size="sm" 
+                                        variant="default" 
+                                        className="text-xs h-7 w-full bg-blue-600 hover:bg-blue-700"
+                                        onClick={async () => {
+                                          try {
+                                            await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
+                                          } catch (error) {
+                                            console.error("Failed to assign task:", error)
+                                          }
+                                        }}
+                                      >
+                                        🎯 Take This Task
+                                      </Button>
+                                    )}
+                                    
+                                    {/* Stage Update Dropdown */}
+                                    <div className="space-y-1">
+                                      <label className="text-xs font-medium text-gray-700">Update Stage:</label>
+                                      <StageUpdateSelect 
+                                        item={item} 
+                                        onStatusUpdate={handleStatusUpdate}
+                                      />
+                                    </div>
+                                    
                                     <Button 
                                       size="sm" 
-                                      variant="outline" 
-                                      className="text-xs h-6 w-full"
-                                      onClick={async () => {
-                                        try {
-                                          await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
-                                        } catch (error) {
-                                          console.error("Failed to assign task:", error)
-                                        }
-                                      }}
+                                      variant="ghost" 
+                                      className="text-xs h-6 w-full hover:bg-gray-100"
+                                      onClick={() => router.push(`/orders/${item.orderId}`)}
                                     >
-                                      Assign to Me
+                                      📋 View Full Order
                                     </Button>
-                                  )}
-                                  
-                                  <StageUpdateSelect 
-                                    item={item} 
-                                    onStatusUpdate={handleStatusUpdate}
-                                  />
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    className="text-xs h-6 w-full"
-                                    onClick={() => window.open(`/orders/${item.orderId}`, '_blank')}
-                                  >
-                                    View Order
-                                  </Button>
+                                  </div>
                                 </div>
-                              </div>
-                            </Card>
+                              </Card>
+                            )
                           ))}
+                          
+                          {/* Show More/Less Controls */}
+                          {filteredStageItems.length > 3 && (
+                            <div className="flex flex-col gap-2 pt-2">
+                              {hasMore && isExpanded && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-8"
+                                  onClick={() => showMoreItems(stage.key)}
+                                >
+                                  Show More ({hiddenCount} remaining)
+                                </Button>
+                              )}
+                              
+                              {!hasMore && isExpanded && maxItems > 5 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-8"
+                                  onClick={() => showLessItems(stage.key)}
+                                >
+                                  Show Less
+                                </Button>
+                              )}
+                              
+                              {!isExpanded && filteredStageItems.length > 3 && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-xs h-8"
+                                  onClick={() => toggleStageExpansion(stage.key)}
+                                >
+                                  Show All ({hiddenCount} more)
+                                </Button>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
