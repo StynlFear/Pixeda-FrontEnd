@@ -29,6 +29,7 @@ interface TaskItem {
   currentStage: ItemStage
   priority: Priority
   assignedTo: string
+  isUnassigned: boolean
 }
 
 const stageColumns = [
@@ -180,52 +181,49 @@ export default function DashboardPage() {
                 dueDate: order.dueDate || '',
                 currentStage: currentStage,
                 priority: order.priority || 'NORMAL',
-                assignedTo: 'All Users' // Admin view shows all
+                assignedTo: 'All Users', // Admin view shows all
+                isUnassigned: false
               })
             } else {
               // For non-admin users, check assignments
               if (!item.assignments || !Array.isArray(item.assignments)) {
-                // If no assignments exist but item is in TO_DO stage, show it to all users
-                // This handles cases where items are moved back to TO_DO without proper assignments
-                if (currentStage === 'TO_DO') {
-                  tasks.push({
-                    orderId: order._id,
-                    itemId: item._id,
-                    assignmentId: item._id, // Use item ID as fallback
-                    orderNumber: order.orderNumber || `Order ${order._id}`,
-                    productName: item.productNameSnapshot || 'Unknown Product',
-                    quantity: item.quantity || 1,
-                    client: clientName,
-                    dueDate: order.dueDate || '',
-                    currentStage: currentStage,
-                    priority: order.priority || 'NORMAL',
-                    assignedTo: 'Available for assignment'
-                  })
-                }
+                // If no assignments exist, show item as unassigned and available for pickup
+                tasks.push({
+                  orderId: order._id,
+                  itemId: item._id,
+                  assignmentId: item._id, // Use item ID as fallback
+                  orderNumber: order.orderNumber || `Order ${order._id}`,
+                  productName: item.productNameSnapshot || 'Unknown Product',
+                  quantity: item.quantity || 1,
+                  client: clientName,
+                  dueDate: order.dueDate || '',
+                  currentStage: currentStage,
+                  priority: order.priority || 'NORMAL',
+                  assignedTo: 'Not assigned to anyone',
+                  isUnassigned: true
+                })
                 continue
               }
 
               // Find the assignment for the current stage
               const currentAssignment = item.assignments.find((assignment: any) => assignment.stage === currentStage)
               
-              // If no assignment for current stage
+              // If no assignment for current stage, show as unassigned and available
               if (!currentAssignment) {
-                // For TO_DO stage, show items without assignments as available for pickup
-                if (currentStage === 'TO_DO') {
-                  tasks.push({
-                    orderId: order._id,
-                    itemId: item._id,
-                    assignmentId: item._id, // Use item ID as fallback
-                    orderNumber: order.orderNumber || `Order ${order._id}`,
-                    productName: item.productNameSnapshot || 'Unknown Product',
-                    quantity: item.quantity || 1,
-                    client: clientName,
-                    dueDate: order.dueDate || '',
-                    currentStage: currentStage,
-                    priority: order.priority || 'NORMAL',
-                    assignedTo: 'Available for assignment'
-                  })
-                }
+                tasks.push({
+                  orderId: order._id,
+                  itemId: item._id,
+                  assignmentId: item._id, // Use item ID as fallback
+                  orderNumber: order.orderNumber || `Order ${order._id}`,
+                  productName: item.productNameSnapshot || 'Unknown Product',
+                  quantity: item.quantity || 1,
+                  client: clientName,
+                  dueDate: order.dueDate || '',
+                  currentStage: currentStage,
+                  priority: order.priority || 'NORMAL',
+                  assignedTo: 'Not assigned to anyone',
+                  isUnassigned: true
+                })
                 continue
               }
 
@@ -234,9 +232,8 @@ export default function DashboardPage() {
                 ? currentAssignment.assignedTo._id 
                 : currentAssignment.assignedTo
 
-              // For TO_DO stage, show all items to all users (they can pick them up)
-              // For other stages, only show items assigned to current user
-              if (currentStage !== 'TO_DO' && assignedToId !== user?._id) continue
+              // Only show items that are assigned to the current user
+              if (assignedToId !== user?._id) continue
 
               tasks.push({
                 orderId: order._id,
@@ -249,7 +246,8 @@ export default function DashboardPage() {
                 dueDate: order.dueDate || '',
                 currentStage: currentStage,
                 priority: order.priority || 'NORMAL',
-                assignedTo: assignedToId
+                assignedTo: assignedToId,
+                isUnassigned: false
               })
             }
           }
@@ -296,6 +294,95 @@ export default function DashboardPage() {
       ))
     } catch (error) {
       console.error("Failed to update status:", error)
+      throw error
+    }
+  }
+
+  // Handle self-assignment
+  const handleSelfAssignment = async (itemId: string, orderId: string, stage: ItemStage) => {
+    try {
+      // Get current order to find the item and update only its assignment
+      const orderResponse = await api.get(`/api/orders/${orderId}`)
+      const orderData = orderResponse.data
+
+      // Find the item and update its assignment
+      const updatedItems = orderData.items.map((item: any) => {
+        if (item._id === itemId) {
+          const existingAssignments = item.assignments || []
+          const assignmentIndex = existingAssignments.findIndex((assignment: any) => assignment.stage === stage)
+          
+          let updatedAssignments
+          if (assignmentIndex >= 0) {
+            // Update existing assignment
+            updatedAssignments = existingAssignments.map((assignment: any, index: number) => 
+              index === assignmentIndex 
+                ? { 
+                    ...assignment, 
+                    assignedTo: user?._id,
+                    assignedAt: new Date().toISOString(),
+                    isActive: true
+                  }
+                : assignment
+            )
+          } else {
+            // Add new assignment with proper structure
+            updatedAssignments = [
+              ...existingAssignments,
+              {
+                stage: stage,
+                assignedTo: user?._id,
+                isActive: true,
+                assignedAt: new Date().toISOString(),
+                stageNotes: ""
+              }
+            ]
+          }
+          
+          return {
+            ...item,
+            product: item.product?._id || item.product, // Send only product ID
+            assignments: updatedAssignments.map((assignment: any) => ({
+              ...assignment,
+              assignedTo: typeof assignment.assignedTo === 'object' && assignment.assignedTo 
+                ? assignment.assignedTo._id 
+                : assignment.assignedTo // Send only user ID
+            }))
+          }
+        }
+        return {
+          ...item,
+          product: item.product?._id || item.product, // Send only product ID
+          assignments: (item.assignments || []).map((assignment: any) => ({
+            ...assignment,
+            assignedTo: typeof assignment.assignedTo === 'object' && assignment.assignedTo 
+              ? assignment.assignedTo._id 
+              : assignment.assignedTo // Send only user ID
+          }))
+        }
+      })
+
+      // Send the complete order data with IDs only
+      const updatePayload = {
+        ...orderData,
+        customer: orderData.customer?._id || orderData.customer, // Send only customer ID
+        customerCompany: orderData.customerCompany?._id || orderData.customerCompany, // Send only company ID if exists
+        items: updatedItems
+      }
+
+      await api.put(`/api/orders/${orderId}`, updatePayload)
+
+      // Update local state
+      setTaskItems(prev => prev.map(task => 
+        task.itemId === itemId && task.isUnassigned
+          ? { 
+              ...task, 
+              assignedTo: user?._id || '',
+              isUnassigned: false
+            }
+          : task
+      ))
+    } catch (error) {
+      console.error("Failed to assign task:", error)
       throw error
     }
   }
@@ -364,7 +451,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-accent">{activeItems.length}</div>
-                <p className="text-xs text-muted-foreground">{isAdmin ? 'Active assignments' : 'Your assignments + available items'}</p>
+                <p className="text-xs text-muted-foreground">{isAdmin ? 'Active assignments' : 'Your assignments + unassigned items'}</p>
               </CardContent>
             </Card>
           </div>
@@ -378,7 +465,7 @@ export default function DashboardPage() {
                   <CardDescription>
                     {isAdmin 
                       ? 'All items in the system organized by workflow stage' 
-                      : 'Items assigned to you and available TO_DO items organized by workflow stage'
+                      : 'Items assigned to you and unassigned items organized by workflow stage'
                     }
                   </CardDescription>
                 </div>
@@ -431,12 +518,7 @@ export default function DashboardPage() {
 
                                 <div>
                                   <p className="font-medium text-sm">{item.productName}</p>
-                                  <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                                </div>
-
-                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                  <User className="h-3 w-3" />
-                                  <span className="truncate">{item.client}</span>
+                                  <p className="text-xs text-muted-foreground">Qty: {item.quantity} • {item.client}</p>
                                 </div>
 
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -446,7 +528,35 @@ export default function DashboardPage() {
                                   </span>
                                 </div>
 
+                                {/* Assignment Status */}
+                                <div className="flex items-center gap-1 text-xs">
+                                  <User className="h-3 w-3" />
+                                  <span className={item.isUnassigned ? 'text-orange-600 font-medium' : 'text-muted-foreground'}>
+                                    {item.assignedTo === 'Not assigned to anyone' ? 'Not assigned to anyone' : 
+                                     item.assignedTo === user?._id ? 'Assigned to you' : 
+                                     item.assignedTo}
+                                  </span>
+                                </div>
+
                                 <div className="space-y-1 pt-2">
+                                  {/* Show assignment button for unassigned items */}
+                                  {item.isUnassigned && !isAdmin && (
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      className="text-xs h-6 w-full"
+                                      onClick={async () => {
+                                        try {
+                                          await handleSelfAssignment(item.itemId, item.orderId, item.currentStage)
+                                        } catch (error) {
+                                          console.error("Failed to assign task:", error)
+                                        }
+                                      }}
+                                    >
+                                      Assign to Me
+                                    </Button>
+                                  )}
+                                  
                                   <StageUpdateSelect 
                                     item={item} 
                                     onStatusUpdate={handleStatusUpdate}
