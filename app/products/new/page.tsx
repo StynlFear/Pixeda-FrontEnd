@@ -21,6 +21,7 @@ export default function NewProductPage() {
       // Ensure price is a number or undefined
       const payload = {
         type: values.type || undefined,
+  material: values.material || undefined,
         productName: values.productName,
         productCode: values.productCode,
         description: values.description || undefined,

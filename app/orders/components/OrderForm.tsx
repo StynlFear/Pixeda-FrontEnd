@@ -213,6 +213,23 @@ export default function OrderForm({
   const [collapsedItems, setCollapsedItems] = React.useState<Set<number>>(
     new Set()
   );
+  // Collapsible states per item for subsections
+  const [collapsedWorkflow, setCollapsedWorkflow] = React.useState<Set<number>>(new Set());
+  const [collapsedImages, setCollapsedImages] = React.useState<Set<number>>(new Set());
+  const [collapsedAssignments, setCollapsedAssignments] = React.useState<Set<number>>(new Set());
+
+  // Default: subsections collapsed. Recompute only when items count changes (avoids fighting user toggles on edits)
+  const prevItemsLenRef = React.useRef<number>(items?.length ?? 0);
+  React.useEffect(() => {
+    const len = items?.length ?? 0;
+    if (len !== prevItemsLenRef.current) {
+      const allIdx = new Set(Array.from({ length: len }, (_, i) => i));
+      setCollapsedWorkflow(allIdx);
+      setCollapsedImages(new Set(allIdx));
+      setCollapsedAssignments(new Set(allIdx));
+      prevItemsLenRef.current = len;
+    }
+  }, [items?.length]);
   const handleSubmit = form.handleSubmit(async (vals) => {
     const me = resolvedMe || "";
 
@@ -250,7 +267,7 @@ export default function OrderForm({
     // Process items and add each field to FormData individually
     vals.items.forEach((item, itemIndex) => {
       // If item is cancelled, no assignments needed
-      let assignments = [];
+      let assignments: { stage: Stage; assignedTo: string; stageNotes?: string }[] = [];
       if (item.itemStatus !== "CANCELLED") {
         // Get disabled stages for this specific item
         const itemDisabledStages = (item.disabledStages || []) as Stage[];
@@ -357,7 +374,6 @@ export default function OrderForm({
 
   async function addProduct(p: any) {
     const next = [
-      ...items,
       {
         product: p._id,
         productNameSnapshot: p.productName,
@@ -374,6 +390,7 @@ export default function OrderForm({
         disabledStages: [],
         assignments: [], // Start with empty assignments - user can fill them later
       },
+      ...items,
     ];
     form.setValue("items", next, { shouldDirty: true });
   }
@@ -387,6 +404,33 @@ export default function OrderForm({
         newSet.add(index);
       }
       return newSet;
+    });
+  };
+
+  const toggleWorkflowCollapse = (index: number) => {
+    setCollapsedWorkflow((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleImagesCollapse = (index: number) => {
+    setCollapsedImages((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleAssignmentsCollapse = (index: number) => {
+    setCollapsedAssignments((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
     });
   };
 
@@ -745,268 +789,321 @@ export default function OrderForm({
                       </div>
                     </div>
 
-                    {/* Per-Product Workflow Configuration */}
-                    <div className="space-y-3 p-3 bg-gray-50 rounded border">
-                      <div className="text-sm font-medium">Workflow Configuration</div>
-                      <div className="text-sm text-muted-foreground">
-                        Select stages to skip for this product
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                        {STAGES.filter(s => s !== "TO_DO" && s !== "DONE" && s !== "CANCELLED" && s !== "STANDBY").map((stage) => {
-                          const isDisabled = itemDisabledStages.includes(stage);
-                          return (
-                            <label key={stage} className="flex items-center space-x-2 cursor-pointer p-2 rounded border bg-white hover:bg-gray-50">
-                              <input
-                                type="checkbox"
-                                checked={isDisabled}
-                                onChange={(e) => {
-                                  const currentDisabled = (it.disabledStages || []) as string[];
-                                  const newDisabled = e.target.checked
-                                    ? [...currentDisabled, stage]
-                                    : currentDisabled.filter(s => s !== stage);
-                                  
-                                  form.setValue(
-                                    `items.${idx}.disabledStages` as any,
-                                    newDisabled,
-                                    { shouldDirty: true }
-                                  );
-                                  
-                                  // Remove assignments for disabled stage
-                                  if (e.target.checked) {
-                                    const currentAssignments = it.assignments || [];
-                                    const updatedAssignments = currentAssignments.filter(a => a.stage !== stage);
-                                    form.setValue(
-                                      `items.${idx}.assignments` as any,
-                                      updatedAssignments,
-                                      { shouldDirty: true }
-                                    );
-                                  }
-                                }}
-                                className="rounded"
-                              />
-                              <span className="text-sm">Skip {stageLabel(stage)}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {itemDisabledStages.length > 0 && (
-                        <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border">
-                          <strong>Skipped stages:</strong> {itemDisabledStages.map(s => stageLabel(s)).join(", ")}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* NEW: Two separate optional image uploads per product */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Graphics Image (optional)
-                        </label>
-                        <div className="space-y-2">
-                          <Input3
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || undefined;
-                              form.setValue(
-                                `items.${idx}.graphicsImage` as any,
-                                file,
-                                { shouldDirty: true }
-                              );
-                            }}
-                          />
-                          {(it as any).graphicsImage && (
-                            <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
-                              <span>Selected: {(it as any).graphicsImage.name || 'Graphics image'}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  form.setValue(
-                                    `items.${idx}.graphicsImage` as any,
-                                    undefined,
-                                    { shouldDirty: true }
-                                  );
-                                }}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-xs font-medium text-muted-foreground">
-                          Finished Product Image (optional)
-                        </label>
-                        <div className="space-y-2">
-                          <Input3
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0] || undefined;
-                              form.setValue(
-                                `items.${idx}.finishedProductImage` as any,
-                                file,
-                                { shouldDirty: true }
-                              );
-                            }}
-                          />
-                          {(it as any).finishedProductImage && (
-                            <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
-                              <span>Selected: {(it as any).finishedProductImage.name || 'Finished product image'}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  form.setValue(
-                                    `items.${idx}.finishedProductImage` as any,
-                                    undefined,
-                                    { shouldDirty: true }
-                                  );
-                                }}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* -------- NEW: Stage assignments grid -------- */}
-                    {it.itemStatus !== "CANCELLED" && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-medium">
-                            Stage assignments
-                          </div>
+                    {/* Per-Product Workflow Configuration (collapsible) */}
+                    <div className="space-y-3 p-3 rounded-md border bg-background">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">Workflow Configuration</div>
                           {itemDisabledStages.length > 0 && (
                             <div className="text-xs text-muted-foreground">
                               Skipped: {itemDisabledStages.map(s => stageLabel(s)).join(", ")}
                             </div>
                           )}
                         </div>
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {availableStages
-                            .filter((stage) => stage !== "CANCELLED" && stage !== "DONE" && stage !== "STANDBY")
-                            .map((stage) => {
-                            // ensure each stage exists in assignments
-                            const assIdx = it.assignments.findIndex(
-                              (a) => a.stage === stage
-                            );
-                            const current =
-                              assIdx >= 0
-                                ? it.assignments[assIdx].assignedTo || ""
-                                : "";
-                            const currentNotes =
-                              assIdx >= 0
-                                ? it.assignments[assIdx].stageNotes || ""
-                                : "";
-                            if (assIdx < 0) {
-                              // lazily add default if missing - but with empty assignedTo
-                              const clone = [
-                                ...it.assignments,
-                                {
-                                  stage,
-                                  assignedTo: "", // Start with empty assignment
-                                  stageNotes: "",
-                                },
-                              ];
-                              form.setValue(
-                                `items.${idx}.assignments` as any,
-                                clone,
-                                { shouldDirty: true }
-                              );
-                            }
-                            return (
-                              <div
-                                key={stage}
-                                className="border rounded p-2 space-y-2 text-sm"
-                              >
-                                <div className="space-y-1">
-                                  <span className="text-xs font-medium text-muted-foreground">
-                                    {stageLabel(stage)}
-                                  </span>
-                                  <AssigneeSelect
-                                    employees={employees}
-                                    value={current}
-                                    onChange={(uid) => {
-                                      const next = [
-                                        ...form.getValues(
-                                          `items.${idx}.assignments` as any
-                                        ),
-                                      ];
-                                      const i = next.findIndex(
-                                        (a: any) => a.stage === stage
-                                      );
-                                      if (i >= 0)
-                                        next[i] = {
-                                          stage,
-                                          assignedTo: uid,
-                                          stageNotes: next[i].stageNotes || "",
-                                        };
-                                      else
-                                        next.push({
-                                          stage,
-                                          assignedTo: uid,
-                                          stageNotes: "",
-                                        });
-                                      form.setValue(
-                                        `items.${idx}.assignments` as any,
-                                        next,
-                                        { shouldDirty: true }
-                                      );
-                                    }}
-                                  />
-                                </div>
-                                <div>
-                                  <Input3
-                                    className="text-xs"
-                                    placeholder={`${
-                                      stage === "PRINTING"
-                                        ? "350gr mat paper"
-                                        : stage === "CUTTING"
-                                        ? "10x15cm"
-                                        : stage === "FINISHING"
-                                        ? "UV coating"
-                                        : "Notes..."
-                                    }`}
-                                    value={currentNotes}
+                        <button
+                          type="button"
+                          onClick={() => toggleWorkflowCollapse(idx)}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Toggle workflow configuration"
+                        >
+                          {collapsedWorkflow.has(idx) ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      {!collapsedWorkflow.has(idx) && (
+                        <>
+                          <div className="text-sm text-muted-foreground">
+                            Select stages to skip for this product
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {STAGES.filter(s => s !== "TO_DO" && s !== "DONE" && s !== "CANCELLED" && s !== "STANDBY").map((stage) => {
+                              const isDisabled = itemDisabledStages.includes(stage);
+                              return (
+                                <label key={stage} className="flex items-center space-x-2 cursor-pointer p-2 rounded-md border bg-card hover:bg-accent/50 transition-colors">
+                                  <input
+                                    type="checkbox"
+                                    checked={isDisabled}
                                     onChange={(e) => {
-                                      const next = [
-                                        ...form.getValues(
-                                          `items.${idx}.assignments` as any
-                                        ),
-                                      ];
-                                      const i = next.findIndex(
-                                        (a: any) => a.stage === stage
-                                      );
-                                      if (i >= 0)
-                                        next[i] = {
-                                          stage,
-                                          assignedTo: next[i].assignedTo,
-                                          stageNotes: e.target.value,
-                                        };
-                                      else
-                                        next.push({
-                                          stage,
-                                          assignedTo: "", // Allow empty assignment
-                                          stageNotes: e.target.value,
-                                        });
+                                      const currentDisabled = (it.disabledStages || []) as string[];
+                                      const newDisabled = e.target.checked
+                                        ? [...currentDisabled, stage]
+                                        : currentDisabled.filter(s => s !== stage);
+                                      
                                       form.setValue(
-                                        `items.${idx}.assignments` as any,
-                                        next,
+                                        `items.${idx}.disabledStages` as any,
+                                        newDisabled,
+                                        { shouldDirty: true }
+                                      );
+                                      
+                                      // Remove assignments for disabled stage
+                                      if (e.target.checked) {
+                                        const currentAssignments = it.assignments || [];
+                                        const updatedAssignments = currentAssignments.filter(a => a.stage !== stage);
+                                        form.setValue(
+                                          `items.${idx}.assignments` as any,
+                                          updatedAssignments,
+                                          { shouldDirty: true }
+                                        );
+                                      }
+                                    }}
+                                    className="rounded"
+                                  />
+                                  <span className="text-sm">Skip {stageLabel(stage)}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {/* NEW: Image uploads (collapsible) */}
+                    <div className="p-3 rounded-md border bg-background">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">Images</div>
+                        <button
+                          type="button"
+                          onClick={() => toggleImagesCollapse(idx)}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label="Toggle images section"
+                        >
+                          {collapsedImages.has(idx) ? (
+                            <ChevronRight className="h-4 w-4" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      {!collapsedImages.has(idx) && (
+                        <div className="mt-3 grid md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">
+                              Graphics Image (optional)
+                            </label>
+                            <div className="space-y-2">
+                              <Input3
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || undefined;
+                                  form.setValue(
+                                    `items.${idx}.graphicsImage` as any,
+                                    file,
+                                    { shouldDirty: true }
+                                  );
+                                }}
+                              />
+                              {(it as any).graphicsImage && (
+                                <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                                  <span>Selected: {(it as any).graphicsImage.name || 'Graphics image'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      form.setValue(
+                                        `items.${idx}.graphicsImage` as any,
+                                        undefined,
                                         { shouldDirty: true }
                                       );
                                     }}
-                                  />
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
                                 </div>
-                              </div>
-                            );
-                          })}
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="text-xs font-medium text-muted-foreground">
+                              Finished Product Image (optional)
+                            </label>
+                            <div className="space-y-2">
+                              <Input3
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || undefined;
+                                  form.setValue(
+                                    `items.${idx}.finishedProductImage` as any,
+                                    file,
+                                    { shouldDirty: true }
+                                  );
+                                }}
+                              />
+                              {(it as any).finishedProductImage && (
+                                <div className="flex items-center justify-between text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                                  <span>Selected: {(it as any).finishedProductImage.name || 'Finished product image'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      form.setValue(
+                                        `items.${idx}.finishedProductImage` as any,
+                                        undefined,
+                                        { shouldDirty: true }
+                                      );
+                                    }}
+                                    className="text-red-600 hover:text-red-800"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
+                      )}
+                    </div>
+
+                    {/* -------- NEW: Stage assignments grid (collapsible) -------- */}
+                    {it.itemStatus !== "CANCELLED" && (
+                      <div className="p-3 rounded-md border bg-background">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium">Stage assignments</div>
+                            {itemDisabledStages.length > 0 && (
+                              <div className="text-xs text-muted-foreground">
+                                Skipped: {itemDisabledStages.map(s => stageLabel(s)).join(", ")}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleAssignmentsCollapse(idx)}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label="Toggle stage assignments"
+                          >
+                            {collapsedAssignments.has(idx) ? (
+                              <ChevronRight className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        {!collapsedAssignments.has(idx) && (
+                          <div className="mt-3 grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {availableStages
+                              .filter((stage) => stage !== "CANCELLED" && stage !== "DONE" && stage !== "STANDBY")
+                              .map((stage) => {
+                                // ensure each stage exists in assignments
+                                const assIdx = it.assignments.findIndex(
+                                  (a) => a.stage === stage
+                                );
+                                const current =
+                                  assIdx >= 0
+                                    ? it.assignments[assIdx].assignedTo || ""
+                                    : "";
+                                const currentNotes =
+                                  assIdx >= 0
+                                    ? it.assignments[assIdx].stageNotes || ""
+                                    : "";
+                                if (assIdx < 0) {
+                                  // lazily add default if missing - but with empty assignedTo
+                                  const clone = [
+                                    ...it.assignments,
+                                    {
+                                      stage,
+                                      assignedTo: "", // Start with empty assignment
+                                      stageNotes: "",
+                                    },
+                                  ];
+                                  form.setValue(
+                                    `items.${idx}.assignments` as any,
+                                    clone,
+                                    { shouldDirty: true }
+                                  );
+                                }
+                                return (
+                                  <div
+                                    key={stage}
+                                    className="border rounded p-2 space-y-2 text-sm"
+                                  >
+                                    <div className="space-y-1">
+                                      <span className="text-xs font-medium text-muted-foreground">
+                                        {stageLabel(stage)}
+                                      </span>
+                                      <AssigneeSelect
+                                        employees={employees}
+                                        value={current}
+                                        onChange={(uid) => {
+                                          const next = [
+                                            ...form.getValues(
+                                              `items.${idx}.assignments` as any
+                                            ),
+                                          ];
+                                          const i = next.findIndex(
+                                            (a: any) => a.stage === stage
+                                          );
+                                          if (i >= 0)
+                                            next[i] = {
+                                              stage,
+                                              assignedTo: uid,
+                                              stageNotes: next[i].stageNotes || "",
+                                            };
+                                          else
+                                            next.push({
+                                              stage,
+                                              assignedTo: uid,
+                                              stageNotes: "",
+                                            });
+                                          form.setValue(
+                                            `items.${idx}.assignments` as any,
+                                            next,
+                                            { shouldDirty: true }
+                                          );
+                                        }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Input3
+                                        className="text-xs"
+                                        placeholder={`${
+                                          stage === "PRINTING"
+                                            ? "350gr mat paper"
+                                            : stage === "CUTTING"
+                                            ? "10x15cm"
+                                            : stage === "FINISHING"
+                                            ? "UV coating"
+                                            : "Notes..."
+                                        }`}
+                                        value={currentNotes}
+                                        onChange={(e) => {
+                                          const next = [
+                                            ...form.getValues(
+                                              `items.${idx}.assignments` as any
+                                            ),
+                                          ];
+                                          const i = next.findIndex(
+                                            (a: any) => a.stage === stage
+                                          );
+                                          if (i >= 0)
+                                            next[i] = {
+                                              stage,
+                                              assignedTo: next[i].assignedTo,
+                                              stageNotes: e.target.value,
+                                            };
+                                          else
+                                            next.push({
+                                              stage,
+                                              assignedTo: "", // Allow empty assignment
+                                              stageNotes: e.target.value,
+                                            });
+                                          form.setValue(
+                                            `items.${idx}.assignments` as any,
+                                            next,
+                                            { shouldDirty: true }
+                                          );
+                                        }}
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
                       </div>
                     )}
 

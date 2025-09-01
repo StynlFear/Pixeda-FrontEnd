@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils"
 type Product = {
   _id: string
   type?: string
+  material?: string
   productName: string
   productCode: string
   description?: string
@@ -112,6 +113,7 @@ export default function ProductsPage() {
           ? raw.map((p: any) => ({
               _id: p._id,
               type: p.type,
+              material: p.material,
               productName: p.productName,
               productCode: p.productCode,
               description: p.description,
@@ -246,6 +248,7 @@ export default function ProductsPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>Type</TableHead>
+                    <TableHead>Material</TableHead>
                     <TableHead>Price</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -254,7 +257,7 @@ export default function ProductsPage() {
                 <TableBody>
                   {loading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                         <div className="inline-flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Loading products…
@@ -263,13 +266,13 @@ export default function ProductsPage() {
                     </TableRow>
                   ) : error ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-red-500">
+                      <TableCell colSpan={7} className="py-8 text-center text-red-500">
                         {error}
                       </TableCell>
                     </TableRow>
                   ) : !Array.isArray(rows) || rows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                         No products found
                       </TableCell>
                     </TableRow>
@@ -281,6 +284,13 @@ export default function ProductsPage() {
                         <TableCell>
                           {p.type ? (
                             <Badge variant="secondary">{p.type}</Badge>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {p.material ? (
+                            <Badge variant="secondary">{p.material}</Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}

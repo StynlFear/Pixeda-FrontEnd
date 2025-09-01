@@ -15,6 +15,7 @@ import {
 
 export type ProductFormValues = {
   type?: string
+  material?: string
   productName: string
   productCode: string
   description?: string
@@ -34,10 +35,17 @@ type ProductFormProps = {
   typeOptions?: string[]
   /** If true, shows a "Custom…" option that reveals a text input */
   allowCustomType?: boolean
+  /** Dropdown options for Material; leave empty to show a plain input */
+  materialOptions?: string[]
+  /** If true, shows a "Custom…" option that reveals a text input */
+  allowCustomMaterial?: boolean
   className?: string
 }
 
 const CUSTOM_VALUE = "__CUSTOM__"
+
+// Stable module-level default to avoid new array instances each render
+const MATERIAL_DEFAULTS = ["Vinyl", "Canvas", "Paper", "Fabric", "Plastic", "Metal", "Wood"]
 
 export default function ProductForm({
   defaultValues,
@@ -47,12 +55,21 @@ export default function ProductForm({
   cancelHref = "/products",
   onCancel,
   onSubmit,
-  typeOptions = [],
+  typeOptions,
   allowCustomType = true,
+  materialOptions,
+  allowCustomMaterial = true,
   className,
 }: ProductFormProps) {
+  // Resolve stable option arrays once per prop change
+  const resolvedTypeOptions = React.useMemo(() => (typeOptions ?? []), [typeOptions])
+  const resolvedMaterialOptions = React.useMemo(
+    () => (materialOptions ?? MATERIAL_DEFAULTS),
+    [materialOptions]
+  )
   const [form, setForm] = React.useState({
     type: defaultValues?.type ?? "",
+    material: defaultValues?.material ?? "",
     productName: defaultValues?.productName ?? "",
     productCode: defaultValues?.productCode ?? "",
     description: defaultValues?.description ?? "",
@@ -62,21 +79,35 @@ export default function ProductForm({
   })
   const [localError, setLocalError] = React.useState<string | null>(null)
   const [typeMode, setTypeMode] = React.useState<"select" | "input">(
-    typeOptions.length > 0 ? "select" : "input"
+    resolvedTypeOptions.length > 0 ? "select" : "input"
+  )
+  const [materialMode, setMaterialMode] = React.useState<"select" | "input">(
+    resolvedMaterialOptions.length > 0 ? "select" : "input"
   )
   const [selectValue, setSelectValue] = React.useState<string>(() => {
-    if (!typeOptions.length) return ""
-    if (allowCustomType && form.type && !typeOptions.includes(form.type)) {
+    if (!resolvedTypeOptions.length) return ""
+    const initialType = defaultValues?.type ?? ""
+    if (allowCustomType && initialType && !resolvedTypeOptions.includes(initialType)) {
       // prefill as custom if default value not in list
       return CUSTOM_VALUE
     }
-    return form.type || ""
+    return initialType || ""
+  })
+  const [materialSelectValue, setMaterialSelectValue] = React.useState<string>(() => {
+    if (!resolvedMaterialOptions.length) return ""
+    const initialMaterial = defaultValues?.material ?? ""
+    if (allowCustomMaterial && initialMaterial && !resolvedMaterialOptions.includes(initialMaterial)) {
+      // prefill as custom if default value not in list
+      return CUSTOM_VALUE
+    }
+    return initialMaterial || ""
   })
 
   React.useEffect(() => {
     // keep in sync when defaults change (e.g., editing)
     setForm({
       type: defaultValues?.type ?? "",
+      material: defaultValues?.material ?? "",
       productName: defaultValues?.productName ?? "",
       productCode: defaultValues?.productCode ?? "",
       description: defaultValues?.description ?? "",
@@ -85,20 +116,60 @@ export default function ProductForm({
           ? String(defaultValues?.price)
           : "",
     })
-    setTypeMode(typeOptions.length > 0 ? "select" : "input")
-    setSelectValue(() => {
-      if (!typeOptions.length) return ""
-      if (allowCustomType && defaultValues?.type && !typeOptions.includes(defaultValues.type)) {
+    setTypeMode(resolvedTypeOptions.length > 0 ? "select" : "input")
+    setMaterialMode(resolvedMaterialOptions.length > 0 ? "select" : "input")
+    
+    // Update select values
+    const newTypeSelectValue = (() => {
+      if (!resolvedTypeOptions.length) return ""
+      if (allowCustomType && defaultValues?.type && !resolvedTypeOptions.includes(defaultValues.type)) {
         return CUSTOM_VALUE
       }
       return defaultValues?.type || ""
-    })
-  }, [defaultValues, typeOptions, allowCustomType])
+    })()
+    setSelectValue(newTypeSelectValue)
+    
+    const newMaterialSelectValue = (() => {
+      if (!resolvedMaterialOptions.length) return ""
+      if (allowCustomMaterial && defaultValues?.material && !resolvedMaterialOptions.includes(defaultValues.material)) {
+        return CUSTOM_VALUE
+      }
+      return defaultValues?.material || ""
+    })()
+    setMaterialSelectValue(newMaterialSelectValue)
+  }, [
+    defaultValues,
+    resolvedTypeOptions,
+    allowCustomType,
+    resolvedMaterialOptions,
+    allowCustomMaterial,
+  ])
 
   const onChange =
     (key: keyof typeof form) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [key]: e.target.value }))
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      let value = e.target.value
+      
+      // Special handling for price field to allow both comma and period
+      if (key === "price") {
+        // Allow only numbers, comma, and period
+        value = value.replace(/[^0-9,.]/g, "")
+        // Ensure only one decimal separator
+        const commaIndex = value.indexOf(",")
+        const periodIndex = value.indexOf(".")
+        
+        if (commaIndex !== -1 && periodIndex !== -1) {
+          // If both exist, keep the last one entered
+          if (commaIndex > periodIndex) {
+            value = value.replace(".", "")
+          } else {
+            value = value.replace(",", "")
+          }
+        }
+      }
+      
+      setForm((f) => ({ ...f, [key]: value }))
+    }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,8 +189,14 @@ export default function ProductForm({
         ? (selectValue === CUSTOM_VALUE ? form.type.trim() : selectValue)
         : form.type.trim()
 
+    const finalMaterial =
+      materialMode === "select"
+        ? (materialSelectValue === CUSTOM_VALUE ? form.material.trim() : materialSelectValue)
+        : form.material.trim()
+
     await onSubmit({
       type: finalType || undefined,
+      material: finalMaterial || undefined,
       productName: form.productName.trim(),
       productCode: form.productCode.trim(),
       description: form.description?.trim() || undefined,
@@ -134,7 +211,7 @@ export default function ProductForm({
         <div className="md:col-span-2">
           <label className="block text-sm font-medium mb-1">Type (optional)</label>
 
-          {typeOptions.length > 0 ? (
+          {resolvedTypeOptions.length > 0 ? (
             <>
               <Select
                 value={selectValue}
@@ -153,7 +230,7 @@ export default function ProductForm({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {typeOptions.map((opt) => (
+                  {resolvedTypeOptions.map((opt) => (
                     <SelectItem key={opt} value={opt}>
                       {opt}
                     </SelectItem>
@@ -192,6 +269,73 @@ export default function ProductForm({
               placeholder="Type (e.g., Stickers, Flyers)"
               value={form.type}
               onChange={onChange("type")}
+              disabled={submitting}
+            />
+          )}
+        </div>
+
+        {/* Material */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">Material (optional)</label>
+
+          {resolvedMaterialOptions.length > 0 ? (
+            <>
+              <Select
+                value={materialSelectValue}
+                onValueChange={(v) => {
+                  if (allowCustomMaterial && v === CUSTOM_VALUE) {
+                    setMaterialMode("input")
+                    setMaterialSelectValue(CUSTOM_VALUE)
+                    return
+                  }
+                  setMaterialSelectValue(v)
+                  setForm((f) => ({ ...f, material: v }))
+                }}
+                disabled={submitting}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {resolvedMaterialOptions.map((opt) => (
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
+                  ))}
+                  {allowCustomMaterial && <SelectItem value={CUSTOM_VALUE}>Custom…</SelectItem>}
+                </SelectContent>
+              </Select>
+
+              {allowCustomMaterial && materialMode === "input" && (
+                <div className="mt-2">
+                  <Input
+                    placeholder="Enter custom material"
+                    value={form.material}
+                    onChange={onChange("material")}
+                    disabled={submitting}
+                  />
+                  <div className="mt-2 flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setMaterialMode("select")
+                        setMaterialSelectValue("")
+                        setForm((f) => ({ ...f, material: "" }))
+                      }}
+                    >
+                      Use dropdown
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <Input
+              placeholder="Material (e.g., Vinyl, Canvas)"
+              value={form.material}
+              onChange={onChange("material")}
               disabled={submitting}
             />
           )}
@@ -249,12 +393,10 @@ export default function ProductForm({
           </label>
           <Input
             id="price"
-            type="number"
-            step="0.01"
             inputMode="decimal"
             value={form.price}
             onChange={onChange("price")}
-            placeholder="e.g., 149.99"
+            placeholder="e.g., 149,99 or 149.99"
             disabled={submitting}
           />
         </div>
