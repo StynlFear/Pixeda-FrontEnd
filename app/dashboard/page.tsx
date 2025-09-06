@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import React from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
@@ -549,8 +549,7 @@ export default function DashboardPage() {
   }
 
   // Fetch orders and transform them into task items
-  useEffect(() => {
-    const fetchTaskItems = async () => {
+  const fetchTaskItems = useCallback(async () => {
       try {
         setLoading(true)
         setError(null)
@@ -728,12 +727,11 @@ export default function DashboardPage() {
       } finally {
         setLoading(false)
       }
-    }
+    }, [user, isAdmin])
 
-    if (user) {
-      fetchTaskItems()
-    }
-  }, [user, isAdmin])
+  useEffect(() => {
+    if (user) fetchTaskItems()
+  }, [user, fetchTaskItems])
 
   // Handle status updates
   const handleStatusUpdate = async (itemId: string, assignmentId: string, newStage: ItemStage) => {
@@ -941,9 +939,12 @@ export default function DashboardPage() {
                 customerCompany: item.customerCompany,
                 orderId: item.orderId,
                 itemId: item.itemId,
-                isUnassigned: item.isUnassigned
+                isUnassigned: item.isUnassigned,
+                assignmentId: item.assignmentId
               }))} 
               onSelfAssign={handleSelfAssignment}
+              onStatusUpdate={handleStatusUpdate}
+              onRefresh={fetchTaskItems}
             />
           </div>
 
