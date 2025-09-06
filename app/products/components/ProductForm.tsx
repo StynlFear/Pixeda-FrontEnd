@@ -219,9 +219,9 @@ export default function ProductForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function createMaterial(nameRaw: string) {
+  async function createMaterial(nameRaw: string): Promise<MaterialItem | null> {
     const name = nameRaw.trim()
-    if (!name) return
+    if (!name) return null
     try {
       setCreateMaterialLoading(true)
       setMaterialError(null)
@@ -229,18 +229,21 @@ export default function ProductForm({
       const created = res.data?.data ?? res.data?.material ?? res.data
       const createdName = typeof created === "string" ? created : (created?.name ?? created?.label ?? name)
       const createdId = typeof created === "object" ? (created?._id ?? created?.id) : undefined
+      const newItem: MaterialItem = { id: createdId, name: createdName }
       // Update local list and select it
       setMaterials((prev) => {
         const prevList = prev || []
         if (prevList.some((m) => m.name === createdName)) return prevList
-        return [...prevList, { id: createdId, name: createdName }]
+        return [...prevList, newItem]
       })
       setSelectedMaterials((prev) => Array.from(new Set([...(prev || []), createdName])))
       setForm((f) => ({ ...f, material: "" }))
       setMaterialQuery("")
       setMaterialsPopoverOpen(false)
+      return newItem
     } catch (e: any) {
       setMaterialError(e?.response?.data?.message || e?.message || "Failed to create material.")
+      return null
     } finally {
       setCreateMaterialLoading(false)
     }
@@ -309,19 +312,40 @@ export default function ProductForm({
         ? (selectValue === CUSTOM_VALUE ? form.type.trim() : selectValue)
         : form.type.trim()
 
-    // Build final materials array (multi-select)
+    // Build final materials array (multi-select) - names first
     const manual = form.material.trim()
-    const finalMaterials = Array.from(new Set([
+    const finalMaterialsNames = Array.from(new Set([
       ...selectedMaterials,
       ...(manual ? [manual] : []),
     ].filter(Boolean)))
 
+    // Map names -> ids, creating missing materials if allowed
+    const materialIds: string[] = []
+    for (const name of finalMaterialsNames) {
+      const existing = materials.find((m) => m.name === name)
+      if (existing?.id) {
+        materialIds.push(existing.id)
+        continue
+      }
+      if (allowCustomMaterial) {
+        const created = await createMaterial(name)
+        if (created?.id) {
+          materialIds.push(created.id)
+        } else {
+          // If creation failed or no id returned, stop and show error
+          return setLocalError(`Failed to create material "${name}". Please create it first or select an existing material.`)
+        }
+      } else {
+        return setLocalError(`Material "${name}" must be selected from the list.`)
+      }
+    }
+
     await onSubmit({
       type: finalType || undefined,
-      // Preserve legacy single material for backward compatibility (first item)
-      material: finalMaterials.length ? finalMaterials[0] : undefined,
-      // New field
-      materials: finalMaterials.length ? finalMaterials : undefined,
+      // Preserve legacy single material as first ID
+      material: materialIds.length ? materialIds[0] : undefined,
+      // New field: array of IDs
+      materials: materialIds.length ? materialIds : undefined,
       productName: form.productName.trim(),
       productCode: form.productCode.trim(),
       description: form.description?.trim() || undefined,

@@ -32,8 +32,8 @@ import { cn } from "@/lib/utils"
 type Product = {
   _id: string
   type?: string
-  material?: string
-  materials?: string[]
+  material?: string | { _id: string; name: string }
+  materials?: Array<string | { _id: string; name: string }>
   productName: string
   productCode: string
   description?: string
@@ -293,12 +293,16 @@ export default function ProductsPage() {
                         <TableCell>
                           {p.materials && p.materials.length ? (
                             <div className="flex flex-wrap gap-1 max-w-[280px]">
-                              {p.materials.map((m) => (
-                                <Badge key={m} variant="secondary">{m}</Badge>
-                              ))}
+                              {p.materials.map((m) => {
+                                const key = typeof m === "string" ? m : m._id
+                                const label = typeof m === "string" ? m : m.name
+                                return (
+                                  <Badge key={key} variant="secondary">{label}</Badge>
+                                )
+                              })}
                             </div>
                           ) : p.material ? (
-                            <Badge variant="secondary">{p.material}</Badge>
+                            <Badge variant="secondary">{typeof p.material === 'string' ? p.material : p.material.name}</Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
