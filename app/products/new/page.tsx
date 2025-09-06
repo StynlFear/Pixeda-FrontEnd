@@ -21,7 +21,10 @@ export default function NewProductPage() {
       // Ensure price is a number or undefined
       const payload = {
         type: values.type || undefined,
-  material: values.material || undefined,
+        // Keep legacy single field for backward-compat
+        material: values.material || (values.materials && values.materials[0]) || undefined,
+        // New multi field
+        materials: values.materials && values.materials.length ? values.materials : undefined,
         productName: values.productName,
         productCode: values.productCode,
         description: values.description || undefined,

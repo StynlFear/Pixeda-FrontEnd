@@ -33,6 +33,7 @@ type Product = {
   _id: string
   type?: string
   material?: string
+  materials?: string[]
   productName: string
   productCode: string
   description?: string
@@ -114,6 +115,7 @@ export default function ProductsPage() {
               _id: p._id,
               type: p.type,
               material: p.material,
+              materials: Array.isArray(p.materials) ? p.materials : undefined,
               productName: p.productName,
               productCode: p.productCode,
               description: p.description,
@@ -289,7 +291,13 @@ export default function ProductsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {p.material ? (
+                          {p.materials && p.materials.length ? (
+                            <div className="flex flex-wrap gap-1 max-w-[280px]">
+                              {p.materials.map((m) => (
+                                <Badge key={m} variant="secondary">{m}</Badge>
+                              ))}
+                            </div>
+                          ) : p.material ? (
                             <Badge variant="secondary">{p.material}</Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>

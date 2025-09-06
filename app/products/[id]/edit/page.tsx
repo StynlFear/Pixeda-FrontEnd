@@ -28,7 +28,9 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
         const { data } = await api.get(`/api/products/${id}`, { signal: controller.signal })
         setDefaults({
           type: data?.type ?? "",
-          material: data?.material ?? "",
+          // Prefer array if backend provides it
+          materials: Array.isArray(data?.materials) ? data.materials : undefined,
+          material: data?.material ?? (Array.isArray(data?.materials) ? data.materials[0] : ""),
           productName: data?.productName ?? "",
           productCode: data?.productCode ?? "",
           description: data?.description ?? "",
@@ -52,7 +54,8 @@ export default function EditProductPage({ params }: { params: { id: string } }) 
     try {
       const payload = {
         type: values.type || undefined,
-  material: values.material || undefined,
+        material: values.material || (values.materials && values.materials[0]) || undefined,
+        materials: values.materials && values.materials.length ? values.materials : undefined,
         productName: values.productName,
         productCode: values.productCode,
         description: values.description || undefined,

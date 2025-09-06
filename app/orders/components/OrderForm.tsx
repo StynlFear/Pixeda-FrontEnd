@@ -1205,7 +1205,12 @@ function CreateProductModal({ onCreated }: { onCreated: (product: any) => void }
     try {
       setSubmitting(true);
       setError(null);
-      const res = await api.post("/api/products", values);
+      const payload: any = {
+        ...values,
+        material: values.material || (values.materials && values.materials[0]) || undefined,
+        materials: values.materials && values.materials.length ? values.materials : undefined,
+      };
+      const res = await api.post("/api/products", payload);
       const product = res?.data;
       if (product) {
         onCreated(product);
