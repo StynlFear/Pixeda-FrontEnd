@@ -844,7 +844,7 @@ export default function DashboardPage() {
         task.itemId === itemId && task.isUnassigned
           ? { 
               ...task, 
-              assignedTo: user?._id || '',
+              assignedTo: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || user?._id || 'Assigned',
               isUnassigned: false
             }
           : task
@@ -926,19 +926,25 @@ export default function DashboardPage() {
 
           {/* Dashboard table (list of active items) */}
           <div>
-            <DashboardTable items={taskItems.map(item => ({
-              orderNumber: item.orderNumber,
-              productName: item.productName,
-              quantity: item.quantity,
-              productMaterial: item.productMaterial || '',
-              client: item.client,
-              orderedBy: item.client,
-              created: item.created || '',
-              dueDate: item.dueDate,
-              currentStage: item.currentStage,
-              assignedTo: typeof item.assignedTo === 'string' ? item.assignedTo : 'Not assigned',
-              customerCompany: item.customerCompany
-            }))} />
+            <DashboardTable 
+              items={taskItems.map(item => ({
+                orderNumber: item.orderNumber,
+                productName: item.productName,
+                quantity: item.quantity,
+                productMaterial: item.productMaterial || '',
+                client: item.client,
+                orderedBy: item.client,
+                created: item.created || '',
+                dueDate: item.dueDate,
+                currentStage: item.currentStage,
+                assignedTo: typeof item.assignedTo === 'string' ? item.assignedTo : 'Not assigned',
+                customerCompany: item.customerCompany,
+                orderId: item.orderId,
+                itemId: item.itemId,
+                isUnassigned: item.isUnassigned
+              }))} 
+              onSelfAssign={handleSelfAssignment}
+            />
           </div>
 
           {/* Task Board */}
