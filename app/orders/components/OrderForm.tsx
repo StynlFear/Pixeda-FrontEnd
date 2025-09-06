@@ -95,6 +95,13 @@ const schema = z.object({
       z.object({
         product: z.string().min(1, "Product is required"),
         productNameSnapshot: z.string().min(1, "Product name is required"),
+        materialsSnapshot: z.array(z.object({
+          _id: z.string(),
+          name: z.string(),
+          createdAt: z.string().optional(),
+          updatedAt: z.string().optional(),
+          __v: z.number().optional()
+        })).default([]),
         descriptionSnapshot: z.string().optional(),
         priceSnapshot: z.number().optional(),
         quantity: z.number().min(1, "Quantity must be at least 1"),
@@ -136,6 +143,38 @@ export default function OrderForm({
 }) {
   const [resolvedMe] = React.useState<string | undefined>(currentUserId);
   const [employees, setEmployees] = React.useState<EmployeeLite[]>([]);
+  interface Material {
+    _id: string;
+    name: string;
+    createdAt?: string;
+    updatedAt?: string;
+    __v?: number;
+  }
+  const [availableMaterials, setAvailableMaterials] = React.useState<Material[]>([]);
+
+  // Fetch available materials
+  React.useEffect(() => {
+    let ignore = false;
+    async function loadMaterials() {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const res = await api.get(`${process.env.NEXT_PUBLIC_API_BASE_URL!}api/materials`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        });
+        
+        if (!ignore) {
+          // Extract materials from the response structure
+          const materials = res.data?.items || res.data?.materials || res.data || [];
+          setAvailableMaterials(Array.isArray(materials) ? materials : []);
+        }
+      } catch (e) {
+        console.error('Failed to load materials:', e);
+        if (!ignore) setAvailableMaterials([]);
+      }
+    }
+    loadMaterials();
+    return () => { ignore = true; };
+  }, []);
 
   // fetch me if not provided
 
@@ -315,6 +354,12 @@ export default function OrderForm({
       // Add each item field to FormData
       formData.append(`items[${itemIndex}][product]`, item.product);
       formData.append(`items[${itemIndex}][productNameSnapshot]`, item.productNameSnapshot);
+      // Add materials (sending only the IDs to the backend)
+      if (item.materialsSnapshot && item.materialsSnapshot.length > 0) {
+        item.materialsSnapshot.forEach((material, materialIndex) => {
+          formData.append(`items[${itemIndex}][materialsSnapshot][${materialIndex}]`, material._id);
+        });
+      }
       formData.append(`items[${itemIndex}][descriptionSnapshot]`, item.descriptionSnapshot || "");
       if (item.priceSnapshot !== undefined) {
         formData.append(`items[${itemIndex}][priceSnapshot]`, item.priceSnapshot.toString());
@@ -377,6 +422,17 @@ export default function OrderForm({
       {
         product: p._id,
         productNameSnapshot: p.productName,
+        materialsSnapshot: Array.isArray(p.materials) 
+          ? p.materials.map((m: any) => {
+              // If m is already a full material object, return it as is
+              if (m && typeof m === 'object' && m._id && m.name) {
+                return m;
+              }
+              // If m is just an ID, try to find the full material object
+              const fullMaterial = availableMaterials.find(material => material._id === m);
+              return fullMaterial || null;
+            }).filter(Boolean)
+          : [],
         descriptionSnapshot: p.description || "",
         priceSnapshot: typeof p.price === "number" ? p.price : undefined,
         quantity: 1,
@@ -636,6 +692,84 @@ export default function OrderForm({
                     <div className="grid md:grid-cols-12 gap-4">
                       {/* LEFT: price, qty, status */}
                       <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {/* Materials Multi-Select */}
+                        <div className="col-span-2 md:col-span-2">
+                          <label className="text-xs font-medium text-muted-foreground">
+                            Materials (snapshot)
+                          </label>
+                          <div className="relative">
+                            <Select4
+                              value=""
+                              onValueChange={(selectedId) => {
+                                const selectedMaterial = availableMaterials.find(m => m._id === selectedId);
+                                if (!selectedMaterial) return;
+                                
+                                const currentMaterials = it.materialsSnapshot || [];
+                                const materialExists = currentMaterials.some(m => m._id === selectedId);
+                                
+                                if (!materialExists) {
+                                  form.setValue(
+                                    `items.${idx}.materialsSnapshot` as any,
+                                    [...currentMaterials, selectedMaterial],
+                                    { shouldDirty: true }
+                                  );
+                                }
+                              }}
+                            >
+                              <SelectTrigger4 className="w-full">
+                                <SelectValue4 
+                                  placeholder={
+                                    it.materialsSnapshot && it.materialsSnapshot.length > 0 
+                                      ? `Selected ${it.materialsSnapshot.length} material(s)`
+                                      : "Add a material..."
+                                  }
+                                />
+                              </SelectTrigger4>
+                              <SelectContent4>
+                                {availableMaterials
+                                  .filter(material => 
+                                    !(it.materialsSnapshot || []).some(m => m._id === material._id)
+                                  )
+                                  .map((material) => (
+                                    <SelectItem4 
+                                      key={material._id} 
+                                      value={material._id}
+                                    >
+                                      {material.name}
+                                    </SelectItem4>
+                                  ))}
+                              </SelectContent4>
+                            </Select4>
+                          </div>
+                          {/* Show selected materials as tags */}
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {(it.materialsSnapshot || []).map((material) => (
+                              <div
+                                key={material._id}
+                                className="inline-flex items-center gap-1 bg-secondary/20 hover:bg-secondary/30 text-secondary-foreground px-2 py-1 rounded-full text-sm transition-colors"
+                              >
+                                {material.name}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const newMaterials = (it.materialsSnapshot || []).filter(
+                                      (m) => m._id !== material._id
+                                    );
+                                    form.setValue(
+                                      `items.${idx}.materialsSnapshot` as any,
+                                      newMaterials,
+                                      { shouldDirty: true }
+                                    );
+                                  }}
+                                  className="ml-1 hover:text-destructive"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
                         <div className="col-span-2 md:col-span-2">
                           <label className="text-xs font-medium text-muted-foreground">
                             Price (snapshot)

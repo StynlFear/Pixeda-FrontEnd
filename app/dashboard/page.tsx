@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch"
 import { Clock, AlertTriangle, CheckCircle, Package, Calendar, User, Loader2, FileText, Info, Target, ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react"
 import { PRIORITY_LABELS } from "@/lib/constants"
 import api from "@/lib/axios"
+import DashboardTable from "./components/DashboardTable"
 
 // Types
 type OrderStatus = "TO_DO" | "READY_TO_BE_TAKEN" | "IN_EXECUTION" | "IN_PAUSE" | "IN_PROGRESS" | "DONE" | "CANCELLED"
@@ -29,10 +30,15 @@ interface TaskItem {
   quantity: number
   client: string
   dueDate: string
+  created?: string
   currentStage: ItemStage
   priority: Priority
   assignedTo: string
   isUnassigned: boolean
+  customerCompany?: {
+    name: string
+    cui: string
+  }
   // Enhanced fields for better task visibility
   productDescription?: string
   specialInstructions?: string
@@ -261,6 +267,9 @@ function ExpandableTaskCard({
 
         {/* Basic Product Info - Always Visible */}
         <div>
+
+          {/* Dashboard table from design - removed from here (was causing ReferenceError) */}
+
           <p className="font-medium text-xs leading-tight truncate">{item.productName}</p>
           <p className="text-xs text-muted-foreground truncate">Qty: {item.quantity} • {item.client}</p>
           {/* Assignment Status - Always Visible */}
@@ -546,10 +555,23 @@ export default function DashboardPage() {
         setLoading(true)
         setError(null)
         
+        // Fetch materials once and build a lookup map
+        let materialsMap: Record<string, string> = {}
+        try {
+          const matRes = await api.get('/api/materials')
+          const mats = matRes.data?.items || matRes.data?.data || matRes.data || []
+          for (const m of mats) {
+            if (m._id) materialsMap[m._id] = m.name || m.title || m.type || m._id
+          }
+        } catch (err) {
+          // ignore material fetch errors, fallback will show raw value
+          console.warn('Failed to fetch materials:', err)
+        }
+
         let allOrders: any[] = []
         let page = 1
         const limit = 50 // Use smaller, more reasonable limit
-        
+
         // Fetch orders with pagination
         while (true) {
           const response = await api.get("/api/orders", {
@@ -581,9 +603,13 @@ export default function DashboardPage() {
         for (const order of allOrders) {
           if (!order.items || !Array.isArray(order.items)) continue
 
-          const clientName = order.customerCompany?.name || 
-                           `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim() ||
-                           'Unknown Client'
+          // Combine company name and client name
+          const clientFullName = `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`.trim()
+          const clientName = order.customerCompany 
+            ? `${order.customerCompany.name} (${clientFullName})`
+            : clientFullName || 'Unknown Client'
+            
+          const created = order.createdAt // Add created date from order
 
           for (const item of order.items) {
             // Get the current stage of the item
@@ -591,16 +617,23 @@ export default function DashboardPage() {
             
             // Extract additional product information
             const productInfo = item.product || {}
+            // Get material name from the materials map
+            const materialId = item.materialsSnapshot?.[0] || item.product?.materials?.[0]?._id
+            const materialName = materialId ? materialsMap[materialId] || 'Unknown Material' : ''
+
             const baseTaskData = {
               orderId: order._id,
               itemId: item._id,
               orderNumber: order.orderNumber || `Order ${order._id}`,
-              productName: item.productNameSnapshot || productInfo.name || 'Unknown Product',
+              productName: item.productNameSnapshot || item.product?.productName || 'Unknown Product',
               quantity: item.quantity || 1,
               client: clientName,
+              created: created,
               dueDate: order.dueDate || '',
               currentStage: currentStage,
               priority: order.priority || 'NORMAL',
+              productMaterial: materialName,
+              customerCompany: order.customerCompany,
               // Enhanced information
               productDescription: productInfo.description || item.descriptionSnapshot || '',
               specialInstructions: item.specialInstructions || order.specialInstructions || '',
@@ -608,7 +641,6 @@ export default function DashboardPage() {
               clientNotes: order.customerNotes || '',
               productType: productInfo.type || productInfo.category || '',
               productSize: productInfo.size || item.size || '',
-              productMaterial: productInfo.material || item.material || '',
               nextStage: getNextStage(currentStage),
               // Additional item-specific information
               textToPrint: item.textToPrint || '',
@@ -890,6 +922,23 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">{isAdmin ? 'All active items' : 'Your assignments + available tasks'}</p>
               </CardContent>
             </Card>
+          </div>
+
+          {/* Dashboard table (list of active items) */}
+          <div>
+            <DashboardTable items={taskItems.map(item => ({
+              orderNumber: item.orderNumber,
+              productName: item.productName,
+              quantity: item.quantity,
+              productMaterial: item.productMaterial || '',
+              client: item.client,
+              orderedBy: item.client,
+              created: item.created || '',
+              dueDate: item.dueDate,
+              currentStage: item.currentStage,
+              assignedTo: typeof item.assignedTo === 'string' ? item.assignedTo : 'Not assigned',
+              customerCompany: item.customerCompany
+            }))} />
           </div>
 
           {/* Task Board */}
