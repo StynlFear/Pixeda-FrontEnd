@@ -36,6 +36,7 @@ export type CompanyLite = {
 
 export type OrderLite = {
   _id: string
+  orderNumber?: string | number
   dueDate?: string
   status: OrderStatus
   priority: Priority
@@ -115,6 +116,7 @@ export function OrdersPageClient() {
         const raw = payload?.data ?? payload?.orders ?? payload?.items ?? []
         const list: OrderLite[] = Array.isArray(raw) ? raw.map((o: any) => ({
           _id: o._id,
+          orderNumber: o.orderNumber ?? o.number ?? o.orderNo ?? o.no ?? undefined,
           customer: o.customer || null,
           customerCompany: o.customerCompany || null,
           dueDate: o.dueDate,
@@ -261,7 +263,7 @@ export function OrdersPageClient() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Order ID</TableHead>
+                <TableHead>Order #</TableHead>
                 <TableHead>Client</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Due</TableHead>
@@ -289,7 +291,11 @@ export function OrdersPageClient() {
               ) : (
                 rows.map((o) => (
                   <TableRow key={o._id}>
-                    <TableCell className="font-medium font-mono text-xs">{o._id.slice(-8)}</TableCell>
+                    <TableCell className="font-medium font-mono text-xs">
+                      {o.orderNumber !== undefined && o.orderNumber !== null && String(o.orderNumber).trim() !== ""
+                        ? String(o.orderNumber)
+                        : o._id.slice(-8)}
+                    </TableCell>
                     <TableCell>
                       {o.customerCompany ? (
                         <div>

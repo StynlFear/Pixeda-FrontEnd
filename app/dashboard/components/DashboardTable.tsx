@@ -29,6 +29,29 @@ type DashboardItem = {
   assignmentId?: string
 }
 
+// Date formatting helpers
+function formatCreatedDate(value?: string) {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value; // fallback to original if invalid
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function formatDueDate(value?: string) {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value; // fallback
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mm}/${yyyy}-${hh}:${min}`;
+}
+
 export default function DashboardTable({ 
   items, 
   onSelfAssign,
@@ -203,8 +226,8 @@ export default function DashboardTable({
                     </div>
                   </td>
                   <td className="border border-border p-2 text-muted-foreground">{r.orderedBy ?? '-'}</td>
-                  <td className="border border-border p-2 text-muted-foreground">{r.created ?? '-'}</td>
-                  <td className="border border-border p-2 text-muted-foreground">{r.dueDate ?? '-'}</td>
+                  <td className="border border-border p-2 text-muted-foreground">{formatCreatedDate(r.created)}</td>
+                  <td className="border border-border p-2 text-muted-foreground">{formatDueDate(r.dueDate)}</td>
                   <td className="border border-border p-2 text-muted-foreground">
                     <div className="flex flex-col gap-1" onClick={(e)=>e.stopPropagation()}>
                       <span className="text-xs font-medium tracking-wide">{r.currentStage ?? '-'}</span>
@@ -244,26 +267,27 @@ export default function DashboardTable({
                       )}
                     </div>
                   </td>
-                  <td className="border border-border p-2 text-muted-foreground">
-                    <div className="flex flex-col gap-1">
-                      <span>{r.assignedTo ?? '-'}</span>
+                  <td className="border border-border p-2 text-muted-foreground text-center">
+                    <div className="flex flex-col gap-1 items-center justify-center">
+                      <span className="text-xs">{r.assignedTo ?? '-'}</span>
                       {(r.isUnassigned || r.assignedTo === 'Not assigned' || r.assignedTo === 'Not assigned to anyone') && r.itemId && r.orderId && r.currentStage && (
                         <Button
                           size="sm"
                           variant="outline"
-                          className="h-7 px-2 text-xs w-fit"
+                          className="h-7 px-2 text-[10px] md:text-[11px] w-fit whitespace-nowrap gap-1 mx-auto"
                           onClick={(e) => handleSelfAssign(e, r.itemId!, r.orderId!, r.currentStage!)}
                           disabled={assigningItems.has(`${r.itemId}-${r.orderId}`)}
                         >
                           {assigningItems.has(`${r.itemId}-${r.orderId}`) ? (
                             <>
-                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              Assigning...
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span className="hidden md:inline">Assigning</span>
+                              <span className="md:hidden">Busy</span>
                             </>
                           ) : (
                             <>
-                              <UserCheck className="h-3 w-3 mr-1" />
-                              Assign to me
+                              <UserCheck className="h-3 w-3" />
+                              <span>Assign to me!</span>
                             </>
                           )}
                         </Button>

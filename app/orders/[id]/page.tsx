@@ -38,9 +38,15 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
     <AppLayout4 breadcrumbs={[{label: "Orders", href: "/orders"},{label: order.orderNumber}]}> 
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary">{order.orderNumber}</h1>
+          <h1 className="text-3xl font-bold text-primary">Order number: {order.orderNumber}</h1>
           <p className="text-muted-foreground">
             Client: {order.customerCompany?.name || `${order.customer?.firstName ?? ''} ${order.customer?.lastName ?? ''}`}
+            {order.customer?.phone && (
+              <span className="ml-3 text-xs border-l pl-3">Phone: {order.customer.phone}</span>
+            )}
+            {order.customer?.whatsapp && (
+              <span className="ml-3 text-xs border-l pl-3">WhatsApp: {order.customer.whatsapp}</span>
+            )}
             {order.customerCompany && (
               <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Company</span>
             )}
@@ -52,6 +58,8 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
       </div>
 
       <div className="grid gap-6">
+        {/* Order & Customer Information Side by Side */}
+  <div className="grid gap-6 md:grid-cols-2 items-stretch">
         {/* Order Meta Information */}
         <Card4>
           <CardHeader4>
@@ -88,10 +96,9 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
               </div>
             </div>
           </CardContent4>
-        </Card4>
-
-        {/* Customer Information */}
-        <Card4>
+  </Card4>
+  {/* Customer Information */}
+  <Card4>
           <CardHeader4>
             <CardTitle4>Customer Information</CardTitle4>
           </CardHeader4>
@@ -103,6 +110,12 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                   {order.customer?.firstName} {order.customer?.lastName}
                   {order.customer?.email && (
                     <div className="text-muted-foreground">{order.customer.email}</div>
+                  )}
+                  {order.customer?.phone && (
+                    <div className="text-muted-foreground">Phone: {order.customer.phone}</div>
+                  )}
+                  {order.customer?.whatsapp && (
+                    <div className="text-muted-foreground">WhatsApp: {order.customer.whatsapp}</div>
                   )}
                 </div>
               </div>
@@ -125,7 +138,8 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
               )}
             </div>
           </CardContent4>
-        </Card4>
+  </Card4>
+  </div>
 
         {/* Items Detailed View */}
         <Card4>
@@ -236,7 +250,8 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling!.style.display = 'block';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                  if (fallback) fallback.style.display = 'block';
                                 }}
                               />
                               <div className="text-xs text-muted-foreground hidden">
@@ -256,7 +271,8 @@ export default function ViewOrderPage({ params }: { params: { id: string } }) {
                                 className="max-w-full h-auto max-h-48 object-contain rounded"
                                 onError={(e) => {
                                   e.currentTarget.style.display = 'none';
-                                  e.currentTarget.nextElementSibling!.style.display = 'block';
+                                  const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                  if (fallback) fallback.style.display = 'block';
                                 }}
                               />
                               <div className="text-xs text-muted-foreground hidden">

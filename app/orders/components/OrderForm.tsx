@@ -216,10 +216,46 @@ export default function OrderForm({
     };
   }, []);
 
+  // --- date time helpers ---
+  function toBackendIso(date: Date): string {
+    // ensure we always send in format YYYY-MM-DDTHH:mm:ss.SSS+00:00 (UTC)
+    const utc = new Date(date.getTime());
+    const iso = utc.toISOString(); // 2025-09-08T12:34:56.789Z
+    // convert trailing Z to +00:00
+    return iso.replace('Z', '+00:00');
+  }
+  function backendIsoNow(): string {
+    return toBackendIso(new Date());
+  }
+  function backendIsoToDatetimeLocal(v?: string): string {
+    if (!v) return '';
+    try {
+      // Accept values like 2025-09-08T00:00:00.000+00:00 or standard ISO with Z
+      let norm = v;
+      if (/\+\d{2}:?\d{2}$/.test(v)) {
+        // Already has offset like +00:00 or +0000; new Date can parse
+      }
+      if (v.endsWith('+00:00')) {
+        norm = v.replace('+00:00', 'Z');
+      }
+      const d = new Date(norm);
+      if (isNaN(d.getTime())) return '';
+      // datetime-local expects YYYY-MM-DDTHH:mm (without seconds)
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    } catch { return ''; }
+  }
+  function datetimeLocalToBackendIso(v: string): string {
+    // v like 2025-09-08T12:34 -> treat as local time; convert to UTC then +00:00
+    if (!v) return backendIsoNow();
+    const d = new Date(v); // interpreted as local time
+    return toBackendIso(d);
+  }
+
   const form = useForm<OrderFormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
-      dueDate: defaults?.dueDate || new Date().toISOString().slice(0, 10),
+      dueDate: defaults?.dueDate || backendIsoNow(),
       receivedThrough: (defaults?.receivedThrough as any) || "IN_PERSON",
       status: (defaults?.status as any) || "TO_DO",
       customer: defaults?.customer || "",
@@ -234,7 +270,7 @@ export default function OrderForm({
   React.useEffect(() => {
     if (defaults && Object.keys(defaults).length > 0) {
       form.reset({
-        dueDate: defaults.dueDate || new Date().toISOString().slice(0, 10),
+        dueDate: defaults.dueDate || backendIsoNow(),
         receivedThrough: (defaults.receivedThrough as any) || "IN_PERSON",
         status: (defaults.status as any) || "TO_DO",
         customer: defaults.customer || "",
@@ -515,13 +551,21 @@ export default function OrderForm({
         </CardHeader5>
         <CardContent5 className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="text-sm text-muted-foreground">Due date</label>
-            <Input3 type="date" {...form.register("dueDate")} />
+            <label className="text-sm text-muted-foreground">Due date & time</label>
+            <Input3
+              type="datetime-local"
+              value={backendIsoToDatetimeLocal(form.watch('dueDate'))}
+              onChange={(e) => {
+                const iso = datetimeLocalToBackendIso(e.target.value);
+                form.setValue('dueDate', iso, { shouldDirty: true });
+              }}
+            />
             {form.formState.errors.dueDate && (
               <div className="text-red-500 text-xs mt-1">
                 {form.formState.errors.dueDate.message}
               </div>
             )}
+            <p className="text-[10px] text-muted-foreground mt-1">Stored as UTC: {form.watch('dueDate')}</p>
           </div>
           <div>
             <label className="text-sm text-muted-foreground">
