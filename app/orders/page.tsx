@@ -313,7 +313,7 @@ export function OrdersPageClient() {
                     <TableCell>
                       {o.createdAt ? (
                         <div className="text-sm">
-                          <div>{new Date(o.createdAt).toLocaleDateString()}</div>
+                          <div>{(() => { const d=new Date(o.createdAt); const dd=String(d.getDate()).padStart(2,"0"); const mm=String(d.getMonth()+1).padStart(2,"0"); const yy=String(d.getFullYear()).slice(-2); return `${dd}/${mm}/${yy}`; })()}</div>
                           <div className="text-xs text-muted-foreground">
                             {new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
@@ -322,7 +322,25 @@ export function OrdersPageClient() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>{o.dueDate ? new Date(o.dueDate).toLocaleDateString() : <span className="text-muted-foreground">-</span>}</TableCell>
+                    <TableCell>
+                      {o.dueDate ? (
+                        <div className="text-sm">
+                          {(() => {
+                            const d = new Date(o.dueDate)
+                            if (isNaN(d.getTime())) return <span className="text-muted-foreground">-</span>
+                            const dd = String(d.getDate()).padStart(2, "0")
+                            const mm = String(d.getMonth() + 1).padStart(2, "0")
+                            const yy = String(d.getFullYear()).slice(-2)
+                            const date = `${dd}/${mm}/${yy}`
+                            const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })
+                            return <>
+                              <div>{date}</div>
+                              <div className="text-xs text-muted-foreground">{time}</div>
+                            </>
+                          })()}
+                        </div>
+                      ) : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
                     <TableCell>
                       <QuickStatusSelect orderId={o._id} value={o.status} onChanged={() => {/* optional refetch */}} />
                     </TableCell>

@@ -284,6 +284,21 @@ export default function OrderForm({
 
   const items = form.watch("items");
 
+  // Local raw input state for price snapshots so users can type comma before normalization
+  const [priceInputs, setPriceInputs] = React.useState<string[]>([]);
+  React.useEffect(() => {
+    // Sync local state length with items; preserve existing typed values
+    setPriceInputs((prev) => {
+      const next: string[] = (items || []).map((it: any, i: number) => {
+        if (prev[i] !== undefined) return prev[i];
+        return typeof it?.priceSnapshot === 'number' && !isNaN(it.priceSnapshot)
+          ? String(it.priceSnapshot)
+          : '';
+      });
+      return next;
+    });
+  }, [items?.length]);
+
   // State to track which products are collapsed
   const [collapsedItems, setCollapsedItems] = React.useState<Set<number>>(
     new Set()
@@ -792,7 +807,10 @@ export default function OrderForm({
                                 key={material._id}
                                 className="inline-flex items-center gap-1 bg-secondary/20 hover:bg-secondary/30 text-secondary-foreground px-2 py-1 rounded-full text-sm transition-colors"
                               >
-                                {material.name}
+                                {/* Show material name; if missing (because only id snapshot stored) try to resolve from availableMaterials */}
+                                {material.name && material.name.trim().length > 0
+                                  ? material.name
+                                  : (availableMaterials.find(m => m._id === material._id)?.name || material._id)}
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -819,19 +837,54 @@ export default function OrderForm({
                             Price (snapshot)
                           </label>
                           <Input3
-                            type="number"
-                            step="0.01"
-                            value={it.priceSnapshot ?? ""}
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="e.g. 149,99 or 149.99"
+                            value={priceInputs[idx] ?? ''}
                             onChange={(e) => {
-                              const v =
-                                e.target.value === ""
-                                  ? undefined
-                                  : Number(e.target.value);
-                              form.setValue(
-                                `items.${idx}.priceSnapshot` as any,
-                                v,
-                                { shouldDirty: true }
-                              );
+                              let raw = e.target.value;
+                              raw = raw.replace(/[^0-9.,]/g, '');
+                              const firstComma = raw.indexOf(',');
+                              const firstDot = raw.indexOf('.');
+                              if (firstComma !== -1 && firstDot !== -1) {
+                                if (firstComma > firstDot) raw = raw.replace('.', '');
+                                else raw = raw.replace(',', '');
+                              }
+                              setPriceInputs((prev) => {
+                                const clone = [...prev];
+                                clone[idx] = raw;
+                                return clone;
+                              });
+                              if (raw === '') {
+                                form.setValue(`items.${idx}.priceSnapshot` as any, undefined, { shouldDirty: true });
+                                return;
+                              }
+                              // Allow user to keep typing after trailing separator, don't coerce yet
+                              if (/[.,]$/.test(raw)) return;
+                              const normalized = raw.replace(',', '.');
+                              const num = Number(normalized);
+                              if (!isNaN(num)) {
+                                form.setValue(`items.${idx}.priceSnapshot` as any, num, { shouldDirty: true });
+                              }
+                            }}
+                            onBlur={() => {
+                              // On blur, if value ends with separator, trim and finalize
+                              let raw = priceInputs[idx] || '';
+                              if (/[.,]$/.test(raw)) raw = raw.slice(0, -1);
+                              if (raw) {
+                                const normalized = raw.replace(',', '.');
+                                const num = Number(normalized);
+                                if (!isNaN(num)) {
+                                  setPriceInputs((prev) => {
+                                    const clone = [...prev];
+                                    clone[idx] = String(num);
+                                    return clone;
+                                  });
+                                  form.setValue(`items.${idx}.priceSnapshot` as any, num, { shouldDirty: true });
+                                }
+                              } else {
+                                form.setValue(`items.${idx}.priceSnapshot` as any, undefined, { shouldDirty: true });
+                              }
                             }}
                           />
                         </div>

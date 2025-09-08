@@ -21,7 +21,23 @@ export default function EditOrderPage({ params }: { params: { id: string } }) {
         
         // Transform the data to match the form structure
         const transformedData = {
-          dueDate: orderData.dueDate ? new Date(orderData.dueDate).toISOString().slice(0, 10) : undefined, // Make due date truly optional
+          // Preserve full ISO dueDate; if backend already stores with offset keep it, else convert to ISO w/ Z
+          dueDate: (() => {
+            if (!orderData.dueDate) return undefined;
+            try {
+              // Accept values like 2025-09-08T12:34:56.000+00:00 or with Z or date-only
+              let raw: string = orderData.dueDate;
+              // If date-only (YYYY-MM-DD) add midnight UTC
+              if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+                raw = raw + 'T00:00:00.000Z';
+              }
+              // Normalize +00:00 to Z for consistency
+              if (raw.endsWith('+00:00')) raw = raw.replace('+00:00', 'Z');
+              const d = new Date(raw);
+              if (isNaN(d.getTime())) return orderData.dueDate; // fallback to original
+              return d.toISOString();
+            } catch { return orderData.dueDate; }
+          })(),
           receivedThrough: orderData.receivedThrough || "IN_PERSON",
           status: orderData.status || "TO_DO",
           customer: JSON.stringify({
@@ -37,6 +53,29 @@ export default function EditOrderPage({ params }: { params: { id: string } }) {
           items: (orderData.items || []).map((item: any) => ({
             product: item.product?._id || item.product,
             productNameSnapshot: item.productNameSnapshot || "",
+            // NEW: ensure materials snapshot (array of {_id, name, ...}) is passed to form so materials show on edit
+            materialsSnapshot: (() => {
+              const raw = item.materialsSnapshot || item.materials || item.product?.materials || [];
+              if (!Array.isArray(raw)) return [];
+              return raw
+                .map((m: any) => {
+                  if (!m) return null;
+                  if (typeof m === 'string') {
+                    return { _id: m, name: '' };
+                  }
+                  // Object form – normalize keys
+                  const id = m._id || m.id || m.materialId || undefined;
+                  if (!id) return null;
+                  return {
+                    _id: id,
+                    name: m.name || m.materialName || '',
+                    createdAt: m.createdAt,
+                    updatedAt: m.updatedAt,
+                    __v: m.__v,
+                  };
+                })
+                .filter(Boolean);
+            })(),
             descriptionSnapshot: item.descriptionSnapshot || "",
             priceSnapshot: item.priceSnapshot,
             quantity: item.quantity || 1,
