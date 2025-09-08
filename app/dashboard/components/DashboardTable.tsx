@@ -71,6 +71,7 @@ export default function DashboardTable({
   // Filtering state
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState<ItemStage | 'ALL'>('ALL');
+  const [orderNumberSearch, setOrderNumberSearch] = useState("");
   // Pagination state
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
@@ -84,16 +85,38 @@ export default function DashboardTable({
     if (stageFilter !== 'ALL') {
       r = r.filter(i => i.currentStage === stageFilter);
     }
+    if (orderNumberSearch.trim()) {
+      const oq = orderNumberSearch.toLowerCase();
+      r = r.filter(i => {
+        const val = i.orderNumber;
+        if (val === undefined || val === null) return false;
+        try { return String(val).toLowerCase().includes(oq); } catch { return false; }
+      });
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
-      r = r.filter(i => (
-        (i.productName || '').toLowerCase().includes(q) ||
-        (i.orderNumber || '').toLowerCase().includes(q) ||
-        (i.client || '').toLowerCase().includes(q)
-      ));
+      const norm = (v: unknown) => {
+        if (v === null || v === undefined) return '';
+        try { return String(v).toLowerCase(); } catch { return ''; }
+      };
+      r = r.filter(i => {
+        const dueFormatted = formatDueDate(i.dueDate); // already guarded
+        const fields: unknown[] = [
+          i.productName,
+          i.productMaterial,
+          // orderNumber intentionally excluded (separate field)
+          i.client,
+          i.customerCompany?.name,
+          i.dueDate,
+          dueFormatted,
+          i.currentStage,
+          i.assignedTo,
+        ];
+        return fields.some(f => norm(f).includes(q));
+      });
     }
     return r;
-  }, [activeItems, stageFilter, search]);
+  }, [activeItems, stageFilter, search, orderNumberSearch]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const currentPage = Math.min(page, pageCount);
@@ -146,11 +169,20 @@ export default function DashboardTable({
     <div className="overflow-auto bg-card rounded shadow-sm p-4 space-y-4">
       <div className="flex flex-col md:flex-row gap-3 md:items-end md:justify-between">
         <div className="flex flex-col gap-2 md:flex-row md:items-end md:gap-4 w-full">
+          <div className="flex flex-col gap-1 w-full md:max-w-[140px]">
+            <label className="text-xs font-medium text-muted-foreground">Order #</label>
+            <input
+              className="h-9 rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="e.g. 1234"
+              value={orderNumberSearch}
+              onChange={e => { setOrderNumberSearch(e.target.value); setPage(1); }}
+            />
+          </div>
           <div className="flex flex-col gap-1 w-full md:max-w-xs">
             <label className="text-xs font-medium text-muted-foreground">Search</label>
             <input
               className="h-9 rounded-md border border-border bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              placeholder="Product, order #, client..."
+              placeholder="Search product, material, client, company, due, status, taken by..."
               value={search}
               onChange={e => { setSearch(e.target.value); setPage(1); }}
             />

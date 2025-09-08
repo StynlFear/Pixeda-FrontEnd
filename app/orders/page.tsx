@@ -61,6 +61,7 @@ export function OrdersPageClient() {
   const sortBy =        sp.get("sortBy") || "createdAt"
   const order  = (sp.get("order") || "desc") as "asc" | "desc"
   const qParam =        sp.get("q")      || ""
+  const orderNumberParam = sp.get("orderNumber") || ""
   const status =        sp.get("status") as OrderStatus | "ALL" | null
   const prio   =        sp.get("priority") as Priority | "ALL" | null
   const from   =        sp.get("from") || "" // due date >= from (YYYY-MM-DD)
@@ -69,7 +70,9 @@ export function OrdersPageClient() {
   const sortValue = `${sortBy}:${order}`
 
   const [searchInput, setSearchInput] = useState(qParam)
+  const [orderNumberInput, setOrderNumberInput] = useState(orderNumberParam)
   const debouncedSearch = useDebounce(searchInput, 400)
+  const debouncedOrderNumber = useDebounce(orderNumberInput, 400)
 
   const [rows, setRows] = useState<OrderLite[]>([])
   const [total, setTotal] = useState(0)
@@ -94,6 +97,7 @@ export function OrdersPageClient() {
   }
 
   useEffect(() => { setSearchInput(qParam) }, [qParam])
+  useEffect(() => { setOrderNumberInput(orderNumberParam) }, [orderNumberParam])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -106,6 +110,7 @@ export function OrdersPageClient() {
           params: {
             page, limit, sortBy, order,
             q: debouncedSearch || undefined,
+            orderNumber: debouncedOrderNumber || undefined,
             status: status && status !== "ALL" ? status : undefined,
             priority: prio && prio !== "ALL" ? prio : undefined,
             from: from || undefined,
@@ -136,11 +141,20 @@ export function OrdersPageClient() {
     }
     load()
     return () => controller.abort()
-  }, [page, limit, sortBy, order, status, prio, from, to, debouncedSearch])
+  }, [page, limit, sortBy, order, status, prio, from, to, debouncedSearch, debouncedOrderNumber])
 
+  // Client-side fallback filtering by order number if backend doesn't filter it
+  const filteredRows = useMemo(() => {
+    if (!orderNumberParam) return rows
+    const q = orderNumberParam.toLowerCase()
+    return rows.filter(r => r.orderNumber !== undefined && r.orderNumber !== null && String(r.orderNumber).toLowerCase().includes(q))
+  }, [rows, orderNumberParam])
+
+  const displayRows = filteredRows
   const totalPages = Math.max(1, Math.ceil(total / limit))
-  const showingFrom = total === 0 ? 0 : (page - 1) * limit + 1
-  const showingTo = Math.min(total, page * limit)
+  const effectiveTotal = orderNumberParam ? filteredRows.length : total
+  const showingFrom = effectiveTotal === 0 ? 0 : (page - 1) * limit + 1
+  const showingTo = Math.min(effectiveTotal, page * limit)
 
   const handleDeleteOrder = async (orderId: string) => {
     setDeletingIds(prev => new Set(prev).add(orderId))
@@ -193,14 +207,30 @@ export function OrdersPageClient() {
       <CardContent>
         {/* Filters */}
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-4">
-          <div className="relative flex-1">
-            <Input
-              placeholder="Search by order # or client…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") pushQuery({ q: searchInput, page: 1 }) }}
-              className="pl-3"
-            />
+          <div className="flex flex-1 gap-2">
+            <div className="relative w-40">
+              <Input
+                placeholder="Order #"
+                value={orderNumberInput}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/[^0-9]/g, '')
+                  setOrderNumberInput(digits)
+                }}
+                onKeyDown={(e) => { if (e.key === "Enter") pushQuery({ orderNumber: orderNumberInput, page: 1 }) }}
+                className="pl-3"
+              />
+            </div>
+            <div className="relative flex-1">
+              <Input
+                placeholder="Search client, company, status…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") pushQuery({ q: searchInput, page: 1 }) }}
+                className="pl-3"
+              />
+            </div>
           </div>
 
           <div className="flex gap-2">
@@ -256,7 +286,13 @@ export function OrdersPageClient() {
           </div>
         </div>
 
-        <EffectApplySearch debouncedSearch={debouncedSearch} currentQ={qParam} pushQuery={pushQuery} />
+        <EffectApplySearch 
+          debouncedSearch={debouncedSearch} 
+          currentQ={qParam} 
+          debouncedOrderNumber={debouncedOrderNumber}
+          currentOrderNumber={orderNumberParam}
+          pushQuery={pushQuery} 
+        />
 
         {/* Table */}
         <div className="rounded-md border">
@@ -284,12 +320,12 @@ export function OrdersPageClient() {
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-red-500">{error}</TableCell>
                 </TableRow>
-              ) : rows.length === 0 ? (
+              ) : displayRows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">No orders found</TableCell>
                 </TableRow>
               ) : (
-                rows.map((o) => (
+                displayRows.map((o) => (
                   <TableRow key={o._id}>
                     <TableCell className="font-medium font-mono text-xs">
                       {o.orderNumber !== undefined && o.orderNumber !== null && String(o.orderNumber).trim() !== ""
@@ -401,7 +437,7 @@ export function OrdersPageClient() {
         {/* Pagination */}
         <div className="flex items-center justify-between mt-4">
           <p className="text-sm text-muted-foreground">
-            {total > 0 ? (<>Showing {showingFrom} to {showingTo} of {total} orders</>) : (<>No results</>)}
+            {effectiveTotal > 0 ? (<>Showing {showingFrom} to {showingTo} of {effectiveTotal} orders</>) : (<>No results</>)}
           </p>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => pushQuery({ page: page - 1 })}>
@@ -421,8 +457,9 @@ export function OrdersPageClient() {
   )
 }
 
-function EffectApplySearch({ debouncedSearch, currentQ, pushQuery }: { debouncedSearch: string; currentQ: string; pushQuery: (n: Record<string, string | number | undefined>) => void }) {
+function EffectApplySearch({ debouncedSearch, currentQ, pushQuery, debouncedOrderNumber, currentOrderNumber }: { debouncedSearch: string; currentQ: string; debouncedOrderNumber: string; currentOrderNumber: string; pushQuery: (n: Record<string, string | number | undefined>) => void }) {
   useEffect(() => { if (debouncedSearch !== currentQ) pushQuery({ q: debouncedSearch, page: 1 }) }, [debouncedSearch])
+  useEffect(() => { if (debouncedOrderNumber !== currentOrderNumber) pushQuery({ orderNumber: debouncedOrderNumber, page: 1 }) }, [debouncedOrderNumber])
   return null
 }
 

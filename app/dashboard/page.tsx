@@ -827,15 +827,31 @@ export default function DashboardPage() {
         }
       })
 
-      // Send the complete order data with IDs only
+      // Build a minimal, mutable payload. Avoid sending immutable fields like orderNumber to prevent validation errors.
+      // Extract & discard immutable/read-only fields if present.
+      const { orderNumber: _omitOrderNumber, createdAt: _omitCreatedAt, updatedAt: _omitUpdatedAt, __v: _omitV, _id: _omitId, statusHistory: _omitStatusHistory, ...rest } = orderData || {}
+
       const updatePayload = {
-        ...orderData,
-        customer: orderData.customer?._id || orderData.customer, // Send only customer ID
-        customerCompany: orderData.customerCompany?._id || orderData.customerCompany, // Send only company ID if exists
-        items: updatedItems
+        ...rest,
+        customer: orderData.customer?._id || orderData.customer,
+        customerCompany: orderData.customerCompany?._id || orderData.customerCompany,
+        // Only include the minimally required item data (id, product ref, assignments)
+        items: updatedItems.map((it: any) => ({
+          _id: it._id,
+          product: it.product,
+          assignments: it.assignments,
+          // Preserve status/stage fields if backend expects them
+          itemStatus: it.itemStatus || it.itemStatusSnapshot || it.itemStatus,
+        }))
       }
 
-      await api.put(`/api/orders/${orderId}`, updatePayload)
+      // Use PATCH for partial update (safer for excluding immutable fields). Fallback to PUT if PATCH fails.
+      try {
+        await api.patch(`/api/orders/${orderId}`, updatePayload)
+      } catch (patchErr) {
+        console.warn('PATCH failed, retrying with PUT (still without orderNumber):', patchErr)
+        await api.put(`/api/orders/${orderId}`, updatePayload)
+      }
 
       // Update local state
       setTaskItems(prev => prev.map(task => 
